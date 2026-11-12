@@ -430,3 +430,290 @@ fn testnet_contract_rejects_mainnet_address() {
     let mut c = Rigbill::new(signer_id(), BtcNetwork::Testnet);
     let _ = c.register_miner(COLD.into(), None);
 }
+
+// ---------------------------------------------------------------- bills
+
+use crate::bills::{BillStatus, BILL_STORAGE_DEPOSIT, GRACE_PERIOD_NS};
+
+const DAY: u64 = 24 * 60 * 60 * 1_000_000_000;
+const T0: u64 = 1_800_000_000 * 1_000_000_000;
+const HOST_ADDR: &str = "0x1111111111111111111111111111111111111111";
+const DEPOSIT_ADDR: &str = TAPROOT;
+
+fn host_id() -> AccountId {
+    "host.near".parse().unwrap()
+}
+
+fn at(predecessor: AccountId, deposit: NearToken, ts: u64) {
+    let ctx = VMContextBuilder::new()
+        .current_account_id(contract_id())
+        .predecessor_account_id(predecessor)
+        .attached_deposit(deposit)
+        .block_timestamp(ts)
+        .build();
+    testing_env!(ctx);
+}
+
+fn issue(c: &mut Rigbill, ts: u64) -> U64 {
+    at(host_id(), BILL_STORAGE_DEPOSIT, ts);
+    c.issue_bill(
+        miner_id(),
+        U64(15_000),
+        "2026-11".into(),
+        U64(ts + 30 * DAY),
+        HOST_ADDR.into(),
+    )
+}
+
+fn accepted(ts: u64) -> (Rigbill, U64) {
+    let mut c = registered();
+    let id = issue(&mut c, ts);
+    at(miner_id(), NearToken::from_near(0), ts);
+    c.accept_bill(id, U64(250_000));
+    (c, id)
+}
+
+#[test]
+fn bill_full_lifecycle_to_quote_approved() {
+    let (mut c, id) = accepted(T0);
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Accepted);
+    assert_eq!(c.get_open_bill(miner_id()).unwrap().id, id);
+    at(host_id(), NearToken::from_near(0), T0 + DAY);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(200_000), U64(T0 + 2 * DAY));
+    let b = c.get_bill(id).unwrap();
+    assert_eq!(b.status, BillStatus::QuoteApproved);
+    let q = b.quote.unwrap();
+    assert_eq!(q.amount_in_sats, U64(200_000));
+    assert_eq!(&q.deposit_script[..2], &[0x51, 0x20]);
+    assert_eq!(c.get_bills_for_host(host_id(), None).len(), 1);
+    assert_eq!(c.get_bills_for_miner(miner_id(), None)[0].id, id);
+}
+
+#[test]
+fn unaccepted_bill_has_no_effect() {
+    let mut c = registered();
+    issue(&mut c, T0);
+    assert!(c.get_open_bill(miner_id()).is_none());
+}
+
+#[test]
+#[should_panic(expected = "STORAGE_DEPOSIT_REQUIRED")]
+fn issue_requires_storage_deposit() {
+    let mut c = registered();
+    at(host_id(), NearToken::from_near(0), T0);
+    c.issue_bill(
+        miner_id(),
+        U64(100),
+        "p".into(),
+        U64(T0 + DAY),
+        HOST_ADDR.into(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "MINER_NOT_REGISTERED")]
+fn issue_requires_registered_miner() {
+    let mut c = registered();
+    at(host_id(), BILL_STORAGE_DEPOSIT, T0);
+    c.issue_bill(
+        "nobody.near".parse().unwrap(),
+        U64(100),
+        "p".into(),
+        U64(T0 + DAY),
+        HOST_ADDR.into(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "BAD_ADDRESS")]
+fn issue_rejects_bad_host_address() {
+    let mut c = registered();
+    at(host_id(), BILL_STORAGE_DEPOSIT, T0);
+    c.issue_bill(
+        miner_id(),
+        U64(100),
+        "p".into(),
+        U64(T0 + DAY),
+        "0x123".into(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "BAD_DUE_DATE")]
+fn issue_rejects_past_due_date() {
+    let mut c = registered();
+    at(host_id(), BILL_STORAGE_DEPOSIT, T0);
+    c.issue_bill(miner_id(), U64(100), "p".into(), U64(T0), HOST_ADDR.into());
+}
+
+#[test]
+#[should_panic(expected = "NOT_MINER")]
+fn only_the_miner_accepts() {
+    let mut c = registered();
+    let id = issue(&mut c, T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.accept_bill(id, U64(1000));
+}
+
+#[test]
+#[should_panic(expected = "BILL_ALREADY_OPEN")]
+fn one_open_bill_per_miner() {
+    let (mut c, _) = accepted(T0);
+    let id2 = issue(&mut c, T0);
+    at(miner_id(), NearToken::from_near(0), T0);
+    c.accept_bill(id2, U64(1000));
+}
+
+#[test]
+fn host_withdraws_issued_bill() {
+    let mut c = registered();
+    let id = issue(&mut c, T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.withdraw_bill(id);
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Withdrawn);
+}
+
+#[test]
+#[should_panic(expected = "BAD_BILL_STATE")]
+fn accepted_bill_cannot_be_withdrawn() {
+    let (mut c, id) = accepted(T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.withdraw_bill(id);
+}
+
+#[test]
+#[should_panic(expected = "NOT_HOST")]
+fn only_host_withdraws() {
+    let mut c = registered();
+    let id = issue(&mut c, T0);
+    at(miner_id(), NearToken::from_near(0), T0);
+    c.withdraw_bill(id);
+}
+
+#[test]
+#[should_panic(expected = "QUOTE_OVER_CEILING")]
+fn rejects_quote_over_ceiling() {
+    let (mut c, id) = accepted(T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(250_001), U64(T0 + DAY));
+}
+
+#[test]
+#[should_panic(expected = "QUOTE_EXPIRED")]
+fn rejects_quote_with_past_deadline() {
+    let (mut c, id) = accepted(T0);
+    at(host_id(), NearToken::from_near(0), T0 + DAY);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(1000), U64(T0 + DAY));
+}
+
+#[test]
+#[should_panic(expected = "NOT_HOST")]
+fn only_host_approves_quote() {
+    let (mut c, id) = accepted(T0);
+    at(miner_id(), NearToken::from_near(0), T0);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(1000), U64(T0 + DAY));
+}
+
+#[test]
+#[should_panic(expected = "BAD_BILL_STATE")]
+fn quote_needs_acceptance_first() {
+    let mut c = registered();
+    let id = issue(&mut c, T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(1000), U64(T0 + DAY));
+}
+
+#[test]
+#[should_panic(expected = "BAD_ADDRESS")]
+fn quote_rejects_deposit_address_on_wrong_network() {
+    let (mut c, id) = accepted(T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.approve_quote(
+        id,
+        "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx".into(),
+        U64(1000),
+        U64(T0 + DAY),
+    );
+}
+
+#[test]
+#[should_panic(expected = "BAD_BILL_STATE")]
+fn live_quote_cannot_be_replaced() {
+    let (mut c, id) = accepted(T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(1000), U64(T0 + DAY));
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(2000), U64(T0 + DAY));
+}
+
+#[test]
+fn expired_quote_can_be_replaced() {
+    let (mut c, id) = accepted(T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(1000), U64(T0 + DAY));
+    at(host_id(), NearToken::from_near(0), T0 + 2 * DAY);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(2000), U64(T0 + 3 * DAY));
+    assert_eq!(
+        c.get_bill(id).unwrap().quote.unwrap().amount_in_sats,
+        U64(2000)
+    );
+}
+
+#[test]
+fn bill_expires_releases_lock() {
+    let (mut c, id) = accepted(T0);
+    let due = T0 + 30 * DAY;
+    let after = due + GRACE_PERIOD_NS + 1;
+    at(host_id(), NearToken::from_near(0), after);
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Expired);
+    assert!(c.get_open_bill(miner_id()).is_none());
+    // A new bill can be accepted once the old one has lapsed.
+    let id2 = issue(&mut c, after);
+    at(miner_id(), NearToken::from_near(0), after);
+    c.accept_bill(id2, U64(1000));
+    assert_eq!(c.get_open_bill(miner_id()).unwrap().id, id2);
+    assert_eq!(c.expire_bill(id), BillStatus::Expired);
+}
+
+#[test]
+fn bill_not_expired_within_grace() {
+    let (mut c, id) = accepted(T0);
+    at(
+        host_id(),
+        NearToken::from_near(0),
+        T0 + 30 * DAY + GRACE_PERIOD_NS,
+    );
+    assert_eq!(c.expire_bill(id), BillStatus::Accepted);
+}
+
+#[test]
+#[should_panic(expected = "BILL_OPEN_HOST_OUTPUT_REQUIRED")]
+fn rejects_cold_only_with_open_bill() {
+    let (mut c, _) = accepted(T0);
+    at(
+        "relayer.near".parse().unwrap(),
+        SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(1)),
+        T0,
+    );
+    let _ = c.sign_split(
+        miner_id(),
+        vec![input(TXID_A, 0, 15_000)],
+        vec![output(COLD, 13_000)],
+    );
+}
+
+#[test]
+fn cold_only_allowed_again_after_bill_expires() {
+    let (mut c, _) = accepted(T0);
+    let after = T0 + 30 * DAY + GRACE_PERIOD_NS + 1;
+    at(
+        "relayer.near".parse().unwrap(),
+        SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(1)),
+        after,
+    );
+    let _ = c.sign_split(
+        miner_id(),
+        vec![input(TXID_A, 0, 15_000)],
+        vec![output(COLD, 13_000)],
+    );
+    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
+}

@@ -1,3 +1,4 @@
+pub mod bills;
 pub mod bip143;
 
 use bip143::{Tx, TxIn, TxOut};
@@ -36,6 +37,10 @@ enum Key {
     Miners,
     Outpoints,
     Splits,
+    Bills,
+    BillsByMiner,
+    BillsByHost,
+    OpenBill,
 }
 
 #[near(serializers = [borsh, json])]
@@ -111,14 +116,20 @@ impl BtcNetwork {
 pub struct Rigbill {
     signer: AccountId,
     btc_network: BtcNetwork,
-    miners: LookupMap<AccountId, Miner>,
+    pub(crate) miners: LookupMap<AccountId, Miner>,
     /// Outpoint key (internal txid ++ vout LE) -> split id holding it.
     outpoints: LookupMap<Vec<u8>, u64>,
     splits: LookupMap<u64, Split>,
     next_split_id: u64,
+    pub(crate) bills: LookupMap<u64, bills::Bill>,
+    pub(crate) bills_by_miner: LookupMap<AccountId, Vec<u64>>,
+    pub(crate) bills_by_host: LookupMap<AccountId, Vec<u64>>,
+    /// Miner -> the one Accepted/QuoteApproved/Paying bill, if any (BR-001).
+    pub(crate) open_bill: LookupMap<AccountId, u64>,
+    pub(crate) next_bill_id: u64,
 }
 
-fn fail(code: &str) -> ! {
+pub(crate) fn fail(code: &str) -> ! {
     env::panic_str(code)
 }
 
@@ -213,6 +224,11 @@ impl Rigbill {
             outpoints: LookupMap::new(Key::Outpoints),
             splits: LookupMap::new(Key::Splits),
             next_split_id: 0,
+            bills: LookupMap::new(Key::Bills),
+            bills_by_miner: LookupMap::new(Key::BillsByMiner),
+            bills_by_host: LookupMap::new(Key::BillsByHost),
+            open_bill: LookupMap::new(Key::OpenBill),
+            next_bill_id: 0,
         }
     }
 
@@ -312,8 +328,12 @@ impl Rigbill {
             fail("STORAGE_DEPOSIT_REQUIRED");
         }
 
-        // No bill exists yet in this phase: the only allowed output is the
-        // miner's cold address.
+        // BR-001: while a bill is open, a split must pay it. The host-output
+        // branch lands in Phase 4. Until then an open bill blocks every split.
+        if self.current_open_bill(&miner).is_some() {
+            fail("BILL_OPEN_HOST_OUTPUT_REQUIRED");
+        }
+        // No open bill: the only allowed output is the miner's cold address.
         if outputs.len() != 1 {
             fail("OUTPUT_NOT_ALLOWED");
         }
