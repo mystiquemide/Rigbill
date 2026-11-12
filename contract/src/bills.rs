@@ -54,9 +54,11 @@ pub struct Bill {
 
 impl Bill {
     fn expired_at(&self, now: u64) -> bool {
+        // Paying is included so a host who never confirms can't hold the
+        // miner's lock forever (FR-014).
         matches!(
             self.status,
-            BillStatus::Accepted | BillStatus::QuoteApproved
+            BillStatus::Accepted | BillStatus::QuoteApproved | BillStatus::Paying
         ) && now > self.due_ns.0.saturating_add(GRACE_PERIOD_NS)
     }
 
@@ -270,6 +272,43 @@ impl Rigbill {
             json!({"bill_id": bill_id, "deposit_address": deposit_address,
                    "amount_in_sats": amount_in_sats, "deadline_ns": deadline_ns}),
         );
+    }
+
+    /// FR-013, P0: the host confirms the USDC arrived. Releases the miner's lock.
+    pub fn confirm_paid(&mut self, bill_id: U64) {
+        let caller = env::predecessor_account_id();
+        let miner = {
+            let b = self.bill_mut(bill_id.0);
+            if b.host != caller {
+                fail("NOT_HOST");
+            }
+            if b.status != BillStatus::Paying {
+                fail("BAD_BILL_STATE");
+            }
+            b.status = BillStatus::Paid;
+            b.miner.clone()
+        };
+        if self.open_bill.get(&miner) == Some(&bill_id.0) {
+            self.open_bill.remove(&miner);
+        }
+        event("bill_paid", json!({"bill_id": bill_id}));
+    }
+
+    /// FR-013: 1Click refunded the swap to the payout address, so the bill
+    /// goes back to Accepted and the host locks a new quote. Host only: a
+    /// false refund report could only cost the host.
+    pub fn report_refund(&mut self, bill_id: U64) {
+        let b = self.bill_mut(bill_id.0);
+        if b.host != env::predecessor_account_id() {
+            fail("NOT_HOST");
+        }
+        if b.status != BillStatus::Paying {
+            fail("BAD_BILL_STATE");
+        }
+        b.status = BillStatus::Accepted;
+        b.quote = None;
+        b.split_id = None;
+        event("bill_refunded", json!({"bill_id": bill_id}));
     }
 
     /// Anyone can apply expiry (FR-014) so the miner's lock releases.

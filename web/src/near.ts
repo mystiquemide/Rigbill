@@ -56,3 +56,13 @@ export interface Bill {
 
 export const getBillsForMiner = (miner: string) => view<Bill[]>(CONTRACT_ID, "get_bills_for_miner", { miner });
 export const getBillsForHost = (host: string) => view<Bill[]>(CONTRACT_ID, "get_bills_for_host", { host });
+
+export interface Split {
+  miner: string;
+  txid: string;
+  outputs: { address: string; value: string }[];
+  status: "Requested" | "Signed" | "Failed";
+  bill_id: string | null;
+}
+
+export const getSplit = (id: string) => view<Split | null>(CONTRACT_ID, "get_split", { split_id: id });

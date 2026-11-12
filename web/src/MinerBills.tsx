@@ -4,6 +4,7 @@ import { btcPriceUsd, usdToSats } from "./oneclick";
 import { ErrorBox, StatusTag } from "./ui";
 import { explain, fmtDate, fromNs, msg, sats, usd, type Load } from "./format";
 import { callContract } from "./wallet";
+import { SplitStatus } from "./SplitStatus";
 
 /** FR-004: the miner sees bills addressed to them and accepts one with a sats ceiling. */
 export function MinerBills({ account }: { account: string }) {
@@ -94,6 +95,7 @@ function BillRow({ bill, canAccept, onDone }: { bill: Bill; canAccept: boolean; 
           <span className="mono">{bill.quote.deposit_address}</span>
         </div>
       )}
+      <SplitStatus bill={bill} />
       {canAccept && (
         <div className="accept">
           <label>

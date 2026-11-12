@@ -7,7 +7,7 @@
   },
   "scripts": {
     "relayer": "tsx src/cli.ts",
-    "test": "tsx --test test/*.test.ts",
+    "test": "NETWORK=mainnet tsx --test test/*.test.ts",
     "typecheck": "tsc"
   },
   "license": "MIT",

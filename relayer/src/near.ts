@@ -1,4 +1,4 @@
-import { Account, JsonRpcProvider, teraToGas } from "near-api-js";
+import { Account, JsonRpcProvider, actions, teraToGas } from "near-api-js";
 
 import { CONTRACT_ID, NEAR_RPC_URL as RPC_URL, SIGNER_ID } from "./config.js";
 
@@ -27,7 +27,22 @@ export interface Split {
   sighashes: string[];
   signatures: string[];
   status: "Requested" | "Signed" | "Failed";
+  bill_id: string | null;
 }
+
+export interface Bill {
+  id: string;
+  host: string;
+  miner: string;
+  usd_cents: string;
+  host_address: string;
+  status: "Issued" | "Accepted" | "QuoteApproved" | "Paying" | "Paid" | "Expired" | "Withdrawn";
+  quote: { deposit_address: string; amount_in_sats: string; deadline_ns: string } | null;
+  split_id: string | null;
+}
+
+export const getOpenBill = (miner: string) => view<Bill | null>(CONTRACT_ID, "get_open_bill", { miner });
+export const getBill = (id: string) => view<Bill | null>(CONTRACT_ID, "get_bill", { bill_id: id });
 
 export const getMiner = (miner: string) => view<Miner | null>(CONTRACT_ID, "get_miner", { miner });
 export const getSplit = (id: number) => view<Split | null>(CONTRACT_ID, "get_split", { split_id: String(id) });
@@ -69,22 +84,25 @@ export async function signSplit(
   outputs: { address: string; value: bigint }[],
 ): Promise<SignSplitResult> {
   const account = relayerAccount();
-  const res: any = await account
-    .callFunctionRaw({
-      contractId: CONTRACT_ID,
-      methodName: "sign_split",
-      args: {
-        miner,
-        inputs: inputs.map((i) => ({ txid: i.txid, vout: i.vout, value: String(i.value) })),
-        outputs: outputs.map((o) => ({ address: o.address, value: String(o.value) })),
-      },
-      deposit: SPLIT_DEPOSIT + BigInt(inputs.length),
-      gas: teraToGas("300"),
-      waitUntil: "FINAL",
-    })
-    .catch((e: any) => {
-      throw new Error(`sign_split rejected: ${e?.message ?? e}`);
-    });
+  // throwOnFailure: false keeps the tx hash when the contract refuses, so a
+  // refusal can be linked on nearblocks like any other transaction.
+  const res: any = await account.signAndSendTransaction({
+    receiverId: CONTRACT_ID,
+    actions: [
+      actions.functionCall(
+        "sign_split",
+        {
+          miner,
+          inputs: inputs.map((i) => ({ txid: i.txid, vout: i.vout, value: String(i.value) })),
+          outputs: outputs.map((o) => ({ address: o.address, value: String(o.value) })),
+        },
+        teraToGas("300"),
+        SPLIT_DEPOSIT + BigInt(inputs.length),
+      ),
+    ],
+    waitUntil: "FINAL",
+    throwOnFailure: false,
+  });
 
   const outcomes = [res.transaction_outcome, ...(res.receipts_outcome ?? [])];
   let splitId: number | null = null;

@@ -61,3 +61,17 @@ export async function quoteBillInBtc(p: {
   if (!res.ok || !body.quote) throw new Error(body?.message ?? `1Click quote ${res.status}`);
   return body.quote;
 }
+
+export type SwapStatus = "KNOWN_DEPOSIT_TX" | "PENDING_DEPOSIT" | "INCOMPLETE_DEPOSIT" | "PROCESSING" | "SUCCESS" | "REFUNDED" | "FAILED";
+
+export interface SwapStatusResponse {
+  status: SwapStatus;
+  swapDetails?: { destinationChainTxHashes?: { hash: string; explorerUrl?: string }[] };
+}
+
+export async function swapStatus(depositAddress: string): Promise<SwapStatusResponse> {
+  const res = await fetch(`${API}/status?depositAddress=${encodeURIComponent(depositAddress)}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.message ?? `1Click status ${res.status}`);
+  return body;
+}

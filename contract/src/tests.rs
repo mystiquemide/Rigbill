@@ -717,3 +717,200 @@ fn cold_only_allowed_again_after_bill_expires() {
     );
     assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
 }
+
+// ---------------------------------------------------------------- phase 4: paying the bill
+
+fn quoted(ts: u64) -> (Rigbill, U64) {
+    let (mut c, id) = accepted(ts);
+    at(host_id(), NearToken::from_near(0), ts);
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(200_000), U64(ts + 3 * DAY));
+    (c, id)
+}
+
+fn split_at(c: &mut Rigbill, ts: u64, inputs: Vec<InputArg>, outputs: Vec<OutputArg>) {
+    let n = inputs.len() as u128;
+    at(
+        "relayer.near".parse().unwrap(),
+        SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(n)),
+        ts,
+    );
+    let _ = c.sign_split(miner_id(), inputs, outputs);
+}
+
+fn pay_split(c: &mut Rigbill, ts: u64) {
+    split_at(
+        c,
+        ts,
+        vec![input(TXID_A, 0, 300_000)],
+        vec![output(DEPOSIT_ADDR, 200_000), output(COLD, 98_000)],
+    );
+}
+
+#[test]
+fn split_pays_bill_and_marks_paying() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    let b = c.get_bill(id).unwrap();
+    assert_eq!(b.status, BillStatus::Paying);
+    assert_eq!(b.split_id, Some(U64(0)));
+    assert_eq!(c.get_split(U64(0)).unwrap().bill_id, Some(id));
+}
+
+#[test]
+#[should_panic(expected = "BILL_OPEN_HOST_OUTPUT_REQUIRED")]
+fn rejects_cold_only_with_approved_quote() {
+    let (mut c, _) = quoted(T0);
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_A, 0, 300_000)],
+        vec![output(COLD, 298_000)],
+    );
+}
+
+#[test]
+#[should_panic(expected = "OUTPUT_NOT_ALLOWED")]
+fn rejects_third_output_with_open_bill() {
+    let (mut c, _) = quoted(T0);
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_A, 0, 300_000)],
+        vec![
+            output(DEPOSIT_ADDR, 200_000),
+            output(COLD, 50_000),
+            output(OTHER, 48_000),
+        ],
+    );
+}
+
+#[test]
+#[should_panic(expected = "OUTPUT_NOT_ALLOWED")]
+fn rejects_swapped_output_order() {
+    let (mut c, _) = quoted(T0);
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_A, 0, 300_000)],
+        vec![output(COLD, 98_000), output(DEPOSIT_ADDR, 200_000)],
+    );
+}
+
+#[test]
+#[should_panic(expected = "OUTPUT_NOT_ALLOWED")]
+fn rejects_deposit_without_cold_output() {
+    let (mut c, _) = quoted(T0);
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_A, 0, 202_000)],
+        vec![output(DEPOSIT_ADDR, 200_000)],
+    );
+}
+
+#[test]
+#[should_panic(expected = "OUTPUT_AMOUNT_MISMATCH")]
+fn rejects_host_amount_mismatch() {
+    let (mut c, _) = quoted(T0);
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_A, 0, 300_000)],
+        vec![output(DEPOSIT_ADDR, 199_999), output(COLD, 98_001)],
+    );
+}
+
+#[test]
+#[should_panic(expected = "QUOTE_EXPIRED")]
+fn rejects_split_after_quote_deadline() {
+    let (mut c, _) = quoted(T0);
+    pay_split(&mut c, T0 + 3 * DAY);
+}
+
+#[test]
+#[should_panic(expected = "BILL_OPEN_HOST_OUTPUT_REQUIRED")]
+fn rejects_second_split_while_paying() {
+    let (mut c, _) = quoted(T0);
+    pay_split(&mut c, T0);
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_B, 0, 300_000)],
+        vec![output(DEPOSIT_ADDR, 200_000), output(COLD, 98_000)],
+    );
+}
+
+#[test]
+fn failed_sign_returns_bill_to_quote_approved() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    set_ctx(
+        contract_id(),
+        NearToken::from_near(0),
+        vec![PromiseResult::Failed],
+    );
+    assert_eq!(c.on_signed(U64(0)), SplitStatus::Failed);
+    let b = c.get_bill(id).unwrap();
+    assert_eq!(b.status, BillStatus::QuoteApproved);
+    assert_eq!(b.split_id, None);
+    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
+}
+
+#[test]
+fn confirm_paid_releases_lock() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.confirm_paid(id);
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Paid);
+    assert!(c.get_open_bill(miner_id()).is_none());
+    // Later payouts with no open bill go to cold storage.
+    split_at(
+        &mut c,
+        T0,
+        vec![input(TXID_B, 0, 50_000)],
+        vec![output(COLD, 48_000)],
+    );
+    assert_eq!(c.get_split(U64(1)).unwrap().bill_id, None);
+}
+
+#[test]
+#[should_panic(expected = "NOT_HOST")]
+fn only_host_confirms_paid() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    at(miner_id(), NearToken::from_near(0), T0);
+    c.confirm_paid(id);
+}
+
+#[test]
+#[should_panic(expected = "BAD_BILL_STATE")]
+fn confirm_paid_needs_paying() {
+    let (mut c, id) = quoted(T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.confirm_paid(id);
+}
+
+#[test]
+fn refund_returns_bill_to_accepted() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.report_refund(id);
+    let b = c.get_bill(id).unwrap();
+    assert_eq!(b.status, BillStatus::Accepted);
+    assert!(b.quote.is_none());
+    assert_eq!(c.get_open_bill(miner_id()).unwrap().id, id);
+    // The host can lock a fresh quote straight away.
+    c.approve_quote(id, DEPOSIT_ADDR.into(), U64(210_000), U64(T0 + DAY));
+}
+
+#[test]
+fn paying_bill_expires_after_grace() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    let after = T0 + 30 * DAY + GRACE_PERIOD_NS + 1;
+    at(host_id(), NearToken::from_near(0), after);
+    assert_eq!(c.expire_bill(id), BillStatus::Expired);
+    assert!(c.get_open_bill(miner_id()).is_none());
+}

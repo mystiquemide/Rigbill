@@ -59,3 +59,7 @@ dd { margin: 0; }
 .tag-quoteapproved, .tag-paying { color: #234e8a; border-color: #b9cbe6; }
 .tag-paid { color: var(--accent); border-color: #a9cdb8; }
 .tag-expired, .tag-withdrawn { color: var(--muted); }
+.timeline { display: grid; gap: 4px; border-left: 2px solid var(--line); padding-left: 10px; }
+.timeline button { justify-self: start; padding: 4px 8px; font-size: 12px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--muted); vertical-align: middle; }
+.dot.on { background: var(--accent); border-color: var(--accent); }

@@ -74,6 +74,8 @@ pub struct Split {
     /// Raw `v1.signer` responses, one per input, in input order.
     pub signatures: Vec<String>,
     pub status: SplitStatus,
+    /// The bill this split pays, if one was open.
+    pub bill_id: Option<U64>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -328,21 +330,52 @@ impl Rigbill {
             fail("STORAGE_DEPOSIT_REQUIRED");
         }
 
-        // BR-001: while a bill is open, a split must pay it. The host-output
-        // branch lands in Phase 4. Until then an open bill blocks every split.
-        if self.current_open_bill(&miner).is_some() {
+        // FR-007 / BR-001. With an open bill the outputs must be exactly the
+        // approved 1Click deposit (quoted amount) followed by the cold address.
+        // Without one, the only output is the cold address.
+        let bill_id = self.current_open_bill(&miner);
+        let expected: Vec<(Vec<u8>, Option<u64>)> = match bill_id {
+            Some(id) => {
+                let b = self
+                    .bills
+                    .get(&id)
+                    .cloned()
+                    .unwrap_or_else(|| fail("BILL_NOT_FOUND"));
+                let q = match (b.status, b.quote) {
+                    (bills::BillStatus::QuoteApproved, Some(q)) => q,
+                    // Accepted without a quote, or a split for this bill is already in flight.
+                    _ => fail("BILL_OPEN_HOST_OUTPUT_REQUIRED"),
+                };
+                if q.deadline_ns.0 <= env::block_timestamp() {
+                    fail("QUOTE_EXPIRED");
+                }
+                vec![
+                    (q.deposit_script, Some(q.amount_in_sats.0)),
+                    (m.cold_script.clone(), None),
+                ]
+            }
+            None => vec![(m.cold_script.clone(), None)],
+        };
+        let scripts: Vec<Vec<u8>> = outputs
+            .iter()
+            .map(|o| address_to_script(&o.address, self.btc_network))
+            .collect();
+        if bill_id.is_some() && !scripts.iter().any(|s| *s == expected[0].0) {
             fail("BILL_OPEN_HOST_OUTPUT_REQUIRED");
         }
-        // No open bill: the only allowed output is the miner's cold address.
-        if outputs.len() != 1 {
+        if scripts.len() != expected.len() || scripts.iter().zip(&expected).any(|(s, e)| *s != e.0)
+        {
             fail("OUTPUT_NOT_ALLOWED");
         }
         let tx_outputs: Vec<TxOut> = outputs
             .iter()
-            .map(|o| {
-                let script = address_to_script(&o.address, self.btc_network);
-                if script != m.cold_script {
-                    fail("OUTPUT_NOT_ALLOWED");
+            .zip(scripts)
+            .zip(&expected)
+            .map(|((o, script), (_, amount))| {
+                if let Some(a) = amount {
+                    if o.value.0 != *a {
+                        fail("OUTPUT_AMOUNT_MISMATCH");
+                    }
                 }
                 if o.value.0 < DUST_LIMIT {
                     fail("DUST_OUTPUT");
@@ -414,8 +447,16 @@ impl Rigbill {
                 sighashes: sighashes.iter().map(|h| hex_encode(h)).collect(),
                 signatures: vec![],
                 status: SplitStatus::Requested,
+                bill_id: bill_id.map(U64),
             },
         );
+        // Mark the bill Paying now, not in the callback, so a second split for
+        // the same bill can't be requested while signatures are pending.
+        if let Some(id) = bill_id {
+            let b = self.bill_mut(id);
+            b.status = bills::BillStatus::Paying;
+            b.split_id = Some(U64(split_id));
+        }
         env::log_str(&format!(
             "EVENT_JSON:{}",
             json!({"standard":"rigbill","version":"1.0.0","event":"split_requested",
@@ -477,6 +518,14 @@ impl Rigbill {
                     .remove(&outpoint_key(&parse_txid(&i.txid), i.vout));
             }
             split.status = SplitStatus::Failed;
+            // Nothing was signed, so the bill goes back to its approved quote.
+            if let Some(id) = split.bill_id {
+                let b = self.bill_mut(id.0);
+                if b.status == bills::BillStatus::Paying && b.split_id == Some(split_id) {
+                    b.status = bills::BillStatus::QuoteApproved;
+                    b.split_id = None;
+                }
+            }
         }
         let status = split.status.clone();
         env::log_str(&format!(

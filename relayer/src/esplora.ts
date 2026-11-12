@@ -42,3 +42,11 @@ export async function isCoinbase(txid: string): Promise<boolean> {
 export async function broadcast(txHex: string): Promise<string> {
   return (await request("/tx", { method: "POST", body: txHex })).text();
 }
+
+/** Confirmation count, or 0 while in the mempool. */
+export async function txStatus(txid: string): Promise<{ confirmed: boolean; confirmations: number; block_height?: number }> {
+  const st = await (await request(`/tx/${txid}/status`)).json();
+  if (!st.confirmed) return { confirmed: false, confirmations: 0 };
+  const tip = await getTipHeight();
+  return { confirmed: true, confirmations: tip - st.block_height + 1, block_height: st.block_height };
+}

@@ -6,6 +6,7 @@ import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, usdToSats, type Quote }
 import { ErrorBox, StatusTag } from "./ui";
 import { explain, fmtDate, fmtTime, fromNs, msg, sats, toNs, usd, type Load } from "./format";
 import { callContract } from "./wallet";
+import { SplitStatus } from "./SplitStatus";
 
 const QUOTE_TTL_DAYS = 3;
 const isEvm = (a: string) => /^0x[0-9a-fA-F]{40}$/.test(a.trim());
@@ -128,11 +129,11 @@ function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
   const quoteExpired = bill.quote && fromNs(bill.quote.deadline_ns).getTime() <= now;
   const needsQuote = bill.status === "Accepted" || (bill.status === "QuoteApproved" && quoteExpired);
 
-  const withdraw = async () => {
+  const act = (method: "withdraw_bill" | "confirm_paid" | "report_refund") => async () => {
     setBusy(true);
     setError(null);
     try {
-      await callContract("withdraw_bill", { bill_id: bill.id }, 0n, 30n);
+      await callContract(method, { bill_id: bill.id }, 0n, 30n);
       onDone();
     } catch (e) {
       setError(explain(e));
@@ -163,7 +164,20 @@ function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
       {bill.status === "Issued" && (
         <div className="row">
           <span className="small muted">Waiting for the miner to accept.</span>
-          <button className="ghost" onClick={withdraw} disabled={busy}>Withdraw</button>
+          <button className="ghost" onClick={act("withdraw_bill")} disabled={busy}>Withdraw</button>
+        </div>
+      )}
+      <SplitStatus bill={bill} />
+      {bill.status === "Paying" && (
+        <div className="accept">
+          <p className="small">
+            Check that the USDC reached <span className="mono">{bill.host_address}</span> (the Basescan link above on
+            mainnet), then confirm. If 1Click refunded the swap, report it and lock a new quote.
+          </p>
+          <div className="row">
+            <button onClick={act("confirm_paid")} disabled={busy}>Confirm paid</button>
+            <button className="ghost" onClick={act("report_refund")} disabled={busy}>Report refund</button>
+          </div>
         </div>
       )}
       {needsQuote && <ApproveQuote bill={bill} onDone={onDone} />}
