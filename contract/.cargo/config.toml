@@ -1,0 +1,5 @@
+# near-sdk routes panics, hashing and other env calls to the NEAR host only
+# when the `near` cfg is set (cargo-near sets it). Without it, contract errors
+# lose their message and show up as an `unreachable` trap.
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "near"]

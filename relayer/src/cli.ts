@@ -45,6 +45,22 @@ function arg(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
+/** Every value of a repeatable flag, e.g. --utxo a --utxo b. */
+function args(name: string): string[] {
+  return process.argv.flatMap((a, i) => (a === `--${name}` && process.argv[i + 1] ? [process.argv[i + 1]] : []));
+}
+
+/** --utxo <txid>:<vout>:<sats> skips the Esplora lookup. The contract still checks every rule. */
+function manualInputs(): B.SplitInput[] {
+  return args("utxo").map((u) => {
+    const [txid, vout, value] = u.split(":");
+    if (!/^[0-9a-f]{64}$/.test(txid ?? "") || !/^\d+$/.test(vout ?? "") || !/^\d+$/.test(value ?? "")) {
+      throw new Error(`--utxo must be <txid>:<vout>:<sats>, got ${u}`);
+    }
+    return { txid, vout: Number(vout), value: BigInt(value) };
+  });
+}
+
 async function cmdAddress(miner: string) {
   const key = await payoutKey(miner);
   const address = B.payoutAddress(key);
@@ -60,13 +76,15 @@ async function cmdUtxos(miner: string) {
 
 async function cmdSplit(miner: string) {
   const dryRun = process.argv.includes("--dry-run");
+  const noBroadcast = process.argv.includes("--no-broadcast");
   const rate = BigInt(arg("fee-rate") ?? FEE_RATE_DEFAULT);
   const key = await payoutKey(miner);
   const address = B.payoutAddress(key);
   const m = await N.getMiner(miner);
   if (!m) throw new Error(`Miner ${miner} is not registered`);
 
-  const inputs = await spendable(address);
+  const manual = manualInputs();
+  const inputs = manual.length ? manual : await spendable(address);
   if (inputs.length === 0) throw new Error(`No confirmed spendable UTXOs at ${address}`);
   const total = inputs.reduce((a, i) => a + i.value, 0n);
   const fee = estimateFee(inputs.length, 1, rate);
@@ -95,6 +113,10 @@ async function cmdSplit(miner: string) {
   const sigs = split.signatures.map((raw, i) =>
     B.verifyMpcSignature(B.parseMpcSignature(raw), hex.decode(local[i]), key));
   const final = B.finalize(tx, key, sigs);
+  if (noBroadcast) {
+    console.log(JSON.stringify({ splitId: r.splitId, verified: true, signedTxid: final.txid, rawTx: final.hex }, null, 2));
+    return;
+  }
   const txid = (await E.broadcast(final.hex)).trim();
   console.log(JSON.stringify({ splitId: r.splitId, txid, mempool: `${MEMPOOL_WEB}/tx/${txid}` }, null, 2));
 }
@@ -102,7 +124,7 @@ async function cmdSplit(miner: string) {
 const [cmd, miner] = process.argv.slice(2);
 const cmds: Record<string, (m: string) => Promise<void>> = { address: cmdAddress, utxos: cmdUtxos, split: cmdSplit };
 if (!cmds[cmd] || !miner) {
-  console.error("Usage: npm run relayer -- <address|utxos|split> <miner.near> [--dry-run] [--fee-rate N]");
+  console.error("Usage: npm run relayer -- <address|utxos|split> <miner.near> [--dry-run] [--no-broadcast] [--fee-rate N] [--utxo txid:vout:sats ...]");
   process.exit(2);
 }
 cmds[cmd](miner).catch((e) => {
