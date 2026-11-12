@@ -1,8 +1,8 @@
 import { Account, JsonRpcProvider, teraToGas } from "near-api-js";
 
-export const CONTRACT_ID = process.env.RIGBILL_CONTRACT ?? "v1.rigbill.near";
-export const SIGNER_ID = process.env.MPC_SIGNER ?? "v1.signer";
-const RPC_URL = process.env.NEAR_RPC_URL ?? "https://rpc.mainnet.near.org";
+import { CONTRACT_ID, NEAR_RPC_URL as RPC_URL, SIGNER_ID } from "./config.js";
+
+export { CONTRACT_ID, SIGNER_ID };
 
 /** Must match the contract's SPLIT_STORAGE_DEPOSIT (0.01 NEAR) plus 1 yocto per input. */
 const SPLIT_DEPOSIT = 10n ** 22n;

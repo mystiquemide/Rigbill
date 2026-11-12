@@ -89,10 +89,28 @@ pub struct OutputArg {
     pub value: U64,
 }
 
+/// Bitcoin network the payout addresses live on. Set once at init (AMD-001).
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BtcNetwork {
+    Mainnet,
+    Testnet,
+}
+
+impl BtcNetwork {
+    fn hrp(self) -> bech32::Hrp {
+        match self {
+            BtcNetwork::Mainnet => bech32::hrp::BC,
+            BtcNetwork::Testnet => bech32::hrp::TB,
+        }
+    }
+}
+
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct Rigbill {
     signer: AccountId,
+    btc_network: BtcNetwork,
     miners: LookupMap<AccountId, Miner>,
     /// Outpoint key (internal txid ++ vout LE) -> split id holding it.
     outpoints: LookupMap<Vec<u8>, u64>,
@@ -127,12 +145,12 @@ fn parse_txid(s: &str) -> [u8; 32] {
     b
 }
 
-/// Mainnet segwit address -> output script. Any witness version is allowed
+/// Segwit address on `network` -> output script. Any witness version is allowed
 /// as a destination. bech32 vs bech32m is checked by the decoder.
-pub fn address_to_script(addr: &str) -> Vec<u8> {
+pub fn address_to_script(addr: &str, network: BtcNetwork) -> Vec<u8> {
     let (hrp, version, program) =
         bech32::segwit::decode(addr).unwrap_or_else(|_| fail("BAD_ADDRESS"));
-    if hrp != bech32::hrp::BC {
+    if hrp != network.hrp() {
         fail("BAD_ADDRESS");
     }
     let v = version.to_u8();
@@ -187,9 +205,10 @@ pub fn payout_path(miner: &AccountId) -> String {
 #[near]
 impl Rigbill {
     #[init]
-    pub fn new(signer: AccountId) -> Self {
+    pub fn new(signer: AccountId, btc_network: BtcNetwork) -> Self {
         Self {
             signer,
+            btc_network,
             miners: LookupMap::new(Key::Miners),
             outpoints: LookupMap::new(Key::Outpoints),
             splits: LookupMap::new(Key::Splits),
@@ -202,7 +221,7 @@ impl Rigbill {
     #[payable]
     pub fn register_miner(&mut self, cold_address: String, fee_cap_sats: Option<U64>) -> Promise {
         let miner_id = env::predecessor_account_id();
-        let cold_script = address_to_script(&cold_address);
+        let cold_script = address_to_script(&cold_address, self.btc_network);
         let fee_cap_sats = fee_cap_sats.unwrap_or(U64(DEFAULT_FEE_CAP));
         let existing = self.miners.get(&miner_id).cloned();
         if existing.is_none() && env::attached_deposit() < MINER_STORAGE_DEPOSIT {
@@ -301,7 +320,7 @@ impl Rigbill {
         let tx_outputs: Vec<TxOut> = outputs
             .iter()
             .map(|o| {
-                let script = address_to_script(&o.address);
+                let script = address_to_script(&o.address, self.btc_network);
                 if script != m.cold_script {
                     fail("OUTPUT_NOT_ALLOWED");
                 }
@@ -462,6 +481,10 @@ impl Rigbill {
         self.outpoints
             .get(&outpoint_key(&parse_txid(&txid), vout))
             .map(|id| U64(*id))
+    }
+
+    pub fn get_btc_network(&self) -> BtcNetwork {
+        self.btc_network
     }
 
     pub fn get_signer(&self) -> AccountId {

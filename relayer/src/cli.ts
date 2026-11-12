@@ -2,6 +2,7 @@ import { base58, hex } from "@scure/base";
 import * as B from "./btc.js";
 import * as E from "./esplora.js";
 import * as N from "./near.js";
+import { MEMPOOL_WEB, NEARBLOCKS_WEB, network } from "./config.js";
 
 const COINBASE_MATURITY = 100;
 const FEE_RATE_DEFAULT = 2n; // sat/vB, override with --fee-rate
@@ -47,8 +48,8 @@ function arg(name: string): string | undefined {
 async function cmdAddress(miner: string) {
   const key = await payoutKey(miner);
   const address = B.payoutAddress(key);
-  console.log(JSON.stringify({ miner, path: `miner/${miner}`, pubkey: hex.encode(key), address,
-    explorer: `https://mempool.space/address/${address}` }, null, 2));
+  console.log(JSON.stringify({ network, miner, path: `miner/${miner}`, pubkey: hex.encode(key), address,
+    explorer: `${MEMPOOL_WEB}/address/${address}` }, null, 2));
 }
 
 async function cmdUtxos(miner: string) {
@@ -81,7 +82,7 @@ async function cmdSplit(miner: string) {
   if (dryRun) return;
 
   const r = await N.signSplit(miner, inputs, outputs);
-  console.log(`NEAR tx: https://nearblocks.io/txns/${r.nearTxHash}  gas burnt: ${r.gasBurnt}`);
+  console.log(`NEAR tx: ${NEARBLOCKS_WEB}/txns/${r.nearTxHash}  gas burnt: ${r.gasBurnt}`);
   if (r.failure) throw new Error(`Refused by contract: ${r.failure}`);
   if (r.splitId === null) throw new Error("No split_requested event in the NEAR tx");
 
@@ -95,7 +96,7 @@ async function cmdSplit(miner: string) {
     B.verifyMpcSignature(B.parseMpcSignature(raw), hex.decode(local[i]), key));
   const final = B.finalize(tx, key, sigs);
   const txid = (await E.broadcast(final.hex)).trim();
-  console.log(JSON.stringify({ splitId: r.splitId, txid, mempool: `https://mempool.space/tx/${txid}` }, null, 2));
+  console.log(JSON.stringify({ splitId: r.splitId, txid, mempool: `${MEMPOOL_WEB}/tx/${txid}` }, null, 2));
 }
 
 const [cmd, miner] = process.argv.slice(2);

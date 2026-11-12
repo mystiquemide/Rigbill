@@ -1,6 +1,7 @@
 import * as btc from "@scure/btc-signer";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { hex } from "@scure/base";
+import { btcNetwork } from "./config.js";
 
 /** Must match the contract constants (ADR-002). */
 export const TX_VERSION = 2;
@@ -32,8 +33,8 @@ export function compressPubkey(xy: Uint8Array): Uint8Array {
   return secp256k1.Point.fromBytes(raw).toBytes(true);
 }
 
-export function payoutAddress(pubkey: Uint8Array): string {
-  return btc.p2wpkh(pubkey).address!;
+export function payoutAddress(pubkey: Uint8Array, net = btcNetwork): string {
+  return btc.p2wpkh(pubkey, net).address!;
 }
 
 /** Unsigned split transaction, serialized exactly as the contract does. */
@@ -41,9 +42,10 @@ export function buildSplitTx(
   pubkey: Uint8Array,
   inputs: SplitInput[],
   outputs: SplitOutput[],
+  net = btcNetwork,
 ): btc.Transaction {
   const tx = new btc.Transaction({ version: TX_VERSION, lockTime: TX_LOCK_TIME });
-  const script = btc.p2wpkh(pubkey).script;
+  const script = btc.p2wpkh(pubkey, net).script;
   for (const i of inputs) {
     tx.addInput({
       txid: i.txid,
@@ -52,7 +54,7 @@ export function buildSplitTx(
       witnessUtxo: { script, amount: i.value },
     });
   }
-  for (const o of outputs) tx.addOutputAddress(o.address, o.value);
+  for (const o of outputs) tx.addOutputAddress(o.address, o.value, net);
   return tx;
 }
 

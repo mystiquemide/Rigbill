@@ -1,7 +1,4 @@
-const BASES = (process.env.ESPLORA_URL ?? "https://mempool.space/api,https://blockstream.info/api")
-  .split(",")
-  .map((s) => s.trim().replace(/\/$/, ""))
-  .filter(Boolean);
+import { ESPLORA_URLS as BASES } from "./config.js";
 
 export interface Utxo {
   txid: string;

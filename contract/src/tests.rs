@@ -45,7 +45,7 @@ fn derived_key_json() -> Vec<u8> {
 
 fn registered() -> Rigbill {
     set_ctx(miner_id(), NearToken::from_near(0), vec![]);
-    let mut c = Rigbill::new(signer_id());
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
     set_ctx(miner_id(), MINER_STORAGE_DEPOSIT, vec![]);
     let _ = c.register_miner(COLD.into(), None);
     set_ctx(
@@ -105,7 +105,7 @@ fn register_stores_derived_payout_key() {
 #[should_panic(expected = "STORAGE_DEPOSIT_REQUIRED")]
 fn register_requires_storage_deposit() {
     set_ctx(miner_id(), NearToken::from_near(0), vec![]);
-    let mut c = Rigbill::new(signer_id());
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
     let _ = c.register_miner(COLD.into(), None);
 }
 
@@ -113,7 +113,7 @@ fn register_requires_storage_deposit() {
 #[should_panic(expected = "BAD_ADDRESS")]
 fn register_rejects_testnet_address() {
     set_ctx(miner_id(), MINER_STORAGE_DEPOSIT, vec![]);
-    let mut c = Rigbill::new(signer_id());
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
     let _ = c.register_miner("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx".into(), None);
 }
 
@@ -121,17 +121,17 @@ fn register_rejects_testnet_address() {
 #[should_panic(expected = "BAD_ADDRESS")]
 fn register_rejects_garbage_address() {
     set_ctx(miner_id(), MINER_STORAGE_DEPOSIT, vec![]);
-    let mut c = Rigbill::new(signer_id());
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
     let _ = c.register_miner("1BoatSLRHtKNngkdXEeobR76b53LETtpyT".into(), None);
 }
 
 #[test]
 fn address_scripts() {
     assert_eq!(
-        hex_encode(&address_to_script(COLD)),
+        hex_encode(&address_to_script(COLD, BtcNetwork::Mainnet)),
         "0014751e76e8199196d454941c45d1b3a323f1433bd6"
     );
-    let tr = address_to_script(TAPROOT);
+    let tr = address_to_script(TAPROOT, BtcNetwork::Mainnet);
     assert_eq!(&tr[..2], &[0x51, 0x20]);
     assert_eq!(tr.len(), 34);
 }
@@ -219,7 +219,7 @@ fn split_requires_deposit() {
 #[should_panic(expected = "MINER_NOT_REGISTERED")]
 fn rejects_unknown_miner() {
     set_ctx(miner_id(), NearToken::from_near(0), vec![]);
-    let mut c = Rigbill::new(signer_id());
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
     relayer_ctx(1);
     let _ = c.sign_split(
         miner_id(),
@@ -232,7 +232,7 @@ fn rejects_unknown_miner() {
 #[should_panic(expected = "MINER_NOT_REGISTERED")]
 fn rejects_miner_without_derived_key() {
     set_ctx(miner_id(), NearToken::from_near(0), vec![]);
-    let mut c = Rigbill::new(signer_id());
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
     set_ctx(miner_id(), MINER_STORAGE_DEPOSIT, vec![]);
     let _ = c.register_miner(COLD.into(), None);
     relayer_ctx(1);
@@ -291,7 +291,7 @@ fn valid_split_reserves_outpoints_and_records_sighash() {
         ],
         outputs: vec![TxOut {
             value: 13_000,
-            script_pubkey: address_to_script(COLD),
+            script_pubkey: address_to_script(COLD, BtcNetwork::Mainnet),
         }],
         lock_time: TX_LOCK_TIME,
     };
@@ -408,4 +408,25 @@ fn split_parity_with_relayer() {
             "a7717276de2e145ce61680f38172a046099c2d412e066470f7c91e1c38f4a213".to_string(),
         ]
     );
+}
+
+#[test]
+fn testnet_contract_accepts_tb1_and_rejects_bc1() {
+    set_ctx(miner_id(), NearToken::from_near(0), vec![]);
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Testnet);
+    set_ctx(miner_id(), MINER_STORAGE_DEPOSIT, vec![]);
+    let _ = c.register_miner("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx".into(), None);
+    assert_eq!(
+        hex_encode(&c.get_miner(miner_id()).unwrap().cold_script),
+        "0014751e76e8199196d454941c45d1b3a323f1433bd6"
+    );
+    assert_eq!(c.get_btc_network(), BtcNetwork::Testnet);
+}
+
+#[test]
+#[should_panic(expected = "BAD_ADDRESS")]
+fn testnet_contract_rejects_mainnet_address() {
+    set_ctx(miner_id(), MINER_STORAGE_DEPOSIT, vec![]);
+    let mut c = Rigbill::new(signer_id(), BtcNetwork::Testnet);
+    let _ = c.register_miner(COLD.into(), None);
 }
