@@ -47,3 +47,15 @@ dt { color: var(--muted); }
 dd { margin: 0; }
 .foot { margin-top: 32px; font-size: 13px; }
 @media (max-width: 560px) { dl { grid-template-columns: 1fr; } .stats { flex-direction: column; gap: 8px; } }
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.tab { background: transparent; color: var(--muted); border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 12px; }
+.tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+.bill { border-top: 1px solid var(--line); padding: 12px 0; display: grid; gap: 6px; }
+.bill:first-of-type { border-top: 0; }
+.accept { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; }
+.accept label { margin: 0; }
+.tag { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.tag-issued, .tag-accepted { color: var(--warn); border-color: #e7d3a6; }
+.tag-quoteapproved, .tag-paying { color: #234e8a; border-color: #b9cbe6; }
+.tag-paid { color: var(--accent); border-color: #a9cdb8; }
+.tag-expired, .tag-withdrawn { color: var(--muted); }

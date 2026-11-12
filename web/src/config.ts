@@ -15,4 +15,6 @@ export const NEARBLOCKS_WEB = testnet ? "https://testnet.nearblocks.io" : "https
 /** Must match the contract's MINER_STORAGE_DEPOSIT and DEFAULT_FEE_CAP. */
 export const MINER_STORAGE_DEPOSIT = 10n ** 22n;
 export const DEFAULT_FEE_CAP = 3000;
+/** Must match the contract's BILL_STORAGE_DEPOSIT. */
+export const BILL_STORAGE_DEPOSIT = 10n ** 22n;
 export const COINBASE_MATURITY = 100;

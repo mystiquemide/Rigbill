@@ -36,3 +36,23 @@ export const getMiner = (miner: string) => view<Miner | null>(CONTRACT_ID, "get_
 /** FR-002: the payout key comes from the MPC contract, derived for this contract and miner. */
 export const derivedPublicKey = (miner: string) =>
   view<string>(SIGNER_ID, "derived_public_key", { path: `miner/${miner}`, predecessor: CONTRACT_ID, domain_id: 0 });
+
+export type BillStatus = "Issued" | "Accepted" | "QuoteApproved" | "Paying" | "Paid" | "Expired" | "Withdrawn";
+
+export interface Bill {
+  id: string;
+  host: string;
+  miner: string;
+  usd_cents: string;
+  period: string;
+  due_ns: string;
+  host_address: string;
+  status: BillStatus;
+  ceiling_sats: string | null;
+  quote: { deposit_address: string; amount_in_sats: string; deadline_ns: string } | null;
+  split_id: string | null;
+  created_ns: string;
+}
+
+export const getBillsForMiner = (miner: string) => view<Bill[]>(CONTRACT_ID, "get_bills_for_miner", { miner });
+export const getBillsForHost = (host: string) => view<Bill[]>(CONTRACT_ID, "get_bills_for_host", { host });

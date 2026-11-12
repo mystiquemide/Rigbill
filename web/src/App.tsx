@@ -12,11 +12,11 @@ import {
 import { getTipHeight, getUtxos, type Utxo } from "./esplora";
 import { derivedPublicKey, getMiner, type Miner } from "./near";
 import { callContract, wallet } from "./wallet";
+import { ErrorBox } from "./ui";
+import { explain, msg, sats, type Load } from "./format";
+import { MinerBills } from "./MinerBills";
+import { HostView } from "./HostView";
 
-type Load<T> = { state: "loading" } | { state: "error"; error: string } | { state: "ok"; data: T };
-
-const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const sats = (n: number) => n.toLocaleString("en-US") + " sats";
 
 export default function App() {
   const [account, setAccount] = useState<string | null | undefined>(undefined);
@@ -55,7 +55,7 @@ export default function App() {
 
       {account === undefined && <p className="muted">Loading wallet...</p>}
       {account === null && <Intro onSignIn={signIn} />}
-      {account && <MinerView account={account} />}
+      {account && <RoleSwitch account={account} />}
 
       <footer className="foot muted">
         Contract{" "}
@@ -64,6 +64,23 @@ export default function App() {
         </a>
       </footer>
     </div>
+  );
+}
+
+function RoleSwitch({ account }: { account: string }) {
+  const [role, setRole] = useState<"miner" | "host">(location.hash === "#host" ? "host" : "miner");
+  const pick = (r: "miner" | "host") => {
+    setRole(r);
+    history.replaceState(null, "", r === "host" ? "#host" : "#miner");
+  };
+  return (
+    <>
+      <nav className="tabs" role="tablist">
+        <button role="tab" aria-selected={role === "miner"} className={role === "miner" ? "tab on" : "tab"} onClick={() => pick("miner")}>I mine</button>
+        <button role="tab" aria-selected={role === "host"} className={role === "host" ? "tab on" : "tab"} onClick={() => pick("host")}>I host miners</button>
+      </nav>
+      {role === "miner" ? <MinerView account={account} /> : <HostView account={account} />}
+    </>
   );
 }
 
@@ -114,6 +131,7 @@ function MinerView({ account }: { account: string }) {
           ) : (
             <PayoutCard payout={payout} pending={!m.payout_pubkey} onRetry={refresh} />
           )}
+          <MinerBills account={account} />
           {payout.state === "ok" && <Balance address={payout.data.address} />}
           <Settings miner={m} onDone={refresh} />
         </>
@@ -256,7 +274,7 @@ function RegisterForm({
       );
       onDone();
     } catch (err) {
-      setError(msg(err));
+      setError(explain(err));
     } finally {
       setBusy(false);
     }
@@ -285,15 +303,5 @@ function RegisterForm({
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>Cancel</button>}
       </div>
     </form>
-  );
-}
-
-function ErrorBox({ what, error, retry }: { what: string; error: string; retry?: () => void }) {
-  return (
-    <section className="card error">
-      <strong>{what}</strong>
-      <p className="mono small">{error}</p>
-      {retry && <button className="ghost" onClick={retry}>Try again</button>}
-    </section>
   );
 }
