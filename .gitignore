@@ -1,0 +1,7 @@
+target/
+node_modules/
+.env
+.env.*
+!.env.example
+PROJECT_PLAN.md
+PROJECT_STATE.md
