@@ -1,0 +1,28 @@
+{
+  "name": "rigbill-relayer",
+  "version": "1.0.0",
+  "description": "Rigbill relayer CLI",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "relayer": "tsx src/cli.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/btc-signer": "^2.4.1",
+    "near-api-js": "^7.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "private": true,
+  "type": "module"
+}

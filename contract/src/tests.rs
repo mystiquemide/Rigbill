@@ -384,3 +384,28 @@ fn sighash_range_constant_is_curve_order() {
         "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
     );
 }
+
+/// Same split as `relayer/test/btc.test.ts` ("split tx parity values"). The
+/// contract and the relayer are independent implementations, so equal txid
+/// and sighashes prove the relayer can assemble what the contract signed.
+#[test]
+fn split_parity_with_relayer() {
+    let mut c = registered();
+    split(
+        &mut c,
+        vec![input(TXID_A, 0, 10_000), input(TXID_B, 3, 5_000)],
+        vec![output(COLD, 13_000)],
+    );
+    let s = c.get_split(U64(0)).unwrap();
+    assert_eq!(
+        s.txid,
+        "d09cbecc9f6ff47dc98dfd2fc38c5f0bdc8a5393c904307b82acae6b69e21427"
+    );
+    assert_eq!(
+        s.sighashes,
+        vec![
+            "7127fabe3a2786ae4d995ade58148d50c14f692a26ff1099720df0ab94af3ac6".to_string(),
+            "a7717276de2e145ce61680f38172a046099c2d412e066470f7c91e1c38f4a213".to_string(),
+        ]
+    );
+}
