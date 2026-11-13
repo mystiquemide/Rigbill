@@ -94,3 +94,5 @@ export async function txResult(hash: string, sender: string): Promise<TxResult> 
   }
   return { ok: true, failure: null };
 }
+
+export const getBill = (id: string) => view<Bill | null>(CONTRACT_ID, "get_bill", { bill_id: id });

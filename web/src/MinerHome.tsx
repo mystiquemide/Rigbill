@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { COINBASE_MATURITY, MEMPOOL_WEB, SIGNER_ID } from "./config";
 import { getTipHeight, getUtxos, type Utxo } from "./esplora";
 import { fmtDate, fmtTime, fromNs, msg, sats, usd } from "./format";
-import { BillRow } from "./MinerBills";
+import { Link } from "./Link";
 import { MinerForm } from "./MinerSetup";
 import { getBillsForMiner, getOpenBill, getSplit, type Bill, type Miner, type Split } from "./near";
 import { SplitStatus } from "./SplitStatus";
@@ -34,7 +34,7 @@ export default function MinerHome({ account, miner, payout, onChanged }: { accou
       {billsError && <ErrorBox what="Couldn't read your bills" error={billsError} retry={loadBills} />}
       {open && <OpenBill bill={open} />}
       <div className="grid-mid">
-        <History bills={bills} account={account} onChanged={loadBills} />
+        <History bills={bills} account={account} />
         {open ? <SweepButton account={account} miner={miner} payoutAddress={payout.address} bill={open} /> : <NoBillNote />}
       </div>
       <Settings miner={miner} payout={payout} onChanged={onChanged} />
@@ -138,43 +138,38 @@ function OpenBill({ bill }: { bill: Bill }) {
   );
 }
 
-function History({ bills, account, onChanged }: { bills: Bill[] | null; account: string; onChanged: () => void }) {
+function History({ bills, account }: { bills: Bill[] | null; account: string }) {
   const hasOpen = !!bills?.some((b) => ["Accepted", "QuoteApproved", "Paying"].includes(b.status));
   return (
     <section className="panel history" aria-labelledby="history-title">
       <div className="row"><p className="kicker" id="history-title">Bills</p>{bills && <span className="muted small">{bills.length} {bills.length === 1 ? "bill" : "bills"}</span>}</div>
       {!bills && <p className="skeleton">Reading your bills from the contract&hellip;</p>}
       {bills?.length === 0 && <p className="note">No bills yet. When your host bills <span className="mono">{account}</span>, it shows up here with what it will cost.</p>}
-      {bills?.map((b) =>
-        b.status === "Issued" ? (
-          <BillRow key={b.id} bill={b} canAccept={!hasOpen} onDone={onChanged} />
-        ) : (
-          <HistoryRow key={b.id} bill={b} />
-        ),
-      )}
+      {bills?.map((b) => <HistoryRow key={b.id} bill={b} canAccept={!hasOpen} />)}
     </section>
   );
 }
 
-function HistoryRow({ bill }: { bill: Bill }) {
+function HistoryRow({ bill, canAccept }: { bill: Bill; canAccept: boolean }) {
   const [split, setSplit] = useState<Split | null>(null);
   useEffect(() => {
     if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null));
   }, [bill.split_id]);
   const extra =
-    bill.status === "Paid" && split ? <a className="mono" href={`${MEMPOOL_WEB}/tx/${split.txid}`} target="_blank" rel="noreferrer">split {split.txid.slice(0, 8)}&hellip;</a>
+    bill.status === "Issued" ? <span className={canAccept ? "lime small" : "muted small"}>{canAccept ? "Review and accept" : "Waits for your open bill"}</span>
+      : bill.status === "Paid" && split ? <span className="mono">split {split.txid.slice(0, 8)}&hellip;</span>
       : bill.status === "QuoteApproved" ? <span className="muted small">Waiting for a payout</span>
       : bill.status === "Accepted" ? <span className="muted small">Waiting for a quote</span>
       : bill.status === "Paying" ? <span className="muted small">Paying now</span>
       : null;
   return (
-    <div className="hist-row">
+    <Link to={`/miner/bills/${bill.id}`} className="hist-row" aria-label={`Bill ${bill.id}, ${usd(Number(bill.usd_cents))}, ${bill.status}`}>
       <span className="mono muted">#{bill.id}</span>
       <strong>{usd(Number(bill.usd_cents))}</strong>
       <span className="muted">{bill.period}</span>
       <StatusTag status={bill.status} />
       <span className="hist-extra">{extra}</span>
-    </div>
+    </Link>
   );
 }
 
