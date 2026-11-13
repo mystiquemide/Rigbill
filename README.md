@@ -135,6 +135,8 @@ cd contract && cargo test
 
 ## Tests
 
+`npm run verify` needs only Node. The unit tests also need Rust (the toolchain is pinned in `rust-toolchain.toml`):
+
 ```bash
 npm test
 ```
