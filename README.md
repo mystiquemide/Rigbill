@@ -99,6 +99,12 @@ Web app (mainnet by default, `VITE_NETWORK=testnet` for testnet):
 cd web && npm install && npm run dev
 ```
 
+To serve it, the root `Dockerfile` builds the app and serves it with nginx (`--build-arg VITE_NETWORK=testnet` for testnet):
+
+```bash
+docker build -t rigbill-web . && docker run -p 8080:80 rigbill-web
+```
+
 Relayer:
 
 ```bash
