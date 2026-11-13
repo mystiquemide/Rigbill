@@ -44,7 +44,7 @@ export function MinerBills({ account }: { account: string }) {
   );
 }
 
-function BillRow({ bill, canAccept, onDone }: { bill: Bill; canAccept: boolean; onDone: () => void }) {
+export function BillRow({ bill, canAccept, onDone }: { bill: Bill; canAccept: boolean; onDone: () => void }) {
   const [ceiling, setCeiling] = useState<string>("");
   const [price, setPrice] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

@@ -6,7 +6,7 @@ import { ContractRefusal } from "./wallet";
 const LABELS: Record<BillStatus, string> = {
   Issued: "Waiting for miner",
   Accepted: "Accepted, needs quote",
-  QuoteApproved: "Quote locked, waiting for payout",
+  QuoteApproved: "Quote locked",
   Paying: "Paying",
   Paid: "Paid",
   Expired: "Expired",

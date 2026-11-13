@@ -23,3 +23,14 @@ export async function getTxStatus(txid: string): Promise<{ inMempool: boolean; c
   const st = await res.json();
   return { inMempool: !st.confirmed, confirmed: st.confirmed, block_height: st.block_height };
 }
+
+/** Current fee rate in sat/vB for confirmation within about 30 minutes. */
+export async function getFeeRate(): Promise<number> {
+  if (ESPLORA.includes("mempool.space") && !ESPLORA.includes("testnet")) {
+    const r = await (await get("/v1/fees/recommended")).json();
+    return r.halfHourFee;
+  }
+  const est: Record<string, number> = await (await get("/fee-estimates")).json();
+  const rate = est["3"] ?? est["6"] ?? Math.min(...Object.values(est));
+  return Math.max(1, Math.ceil(rate));
+}
