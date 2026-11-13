@@ -1,8 +1,12 @@
 # Rigbill
 
+[![CI](https://github.com/mystiquemide/Rigbill/actions/workflows/ci.yml/badge.svg)](https://github.com/mystiquemide/Rigbill/actions/workflows/ci.yml)
+
 A Bitcoin payout address that pays the miner's hosting bill in USDC first and sends the rest to cold storage, with no company holding the keys.
 
 Miners earn BTC but pay hosting in dollars. Today the only automatic conversion is custodial: a pool converts your balance for you, or you sell by hand every month. Rigbill gives each miner a payout address that a NEAR smart contract controls through Chain Signatures. While the host's bill is open, the contract will only sign a Bitcoin transaction that pays that bill through NEAR Intents, with the remainder going to the miner's own wallet.
+
+![Rigbill landing page with a live paid bill read from the contract](docs/screens/landing.webp)
 
 ![Architecture](docs/diagram.svg)
 
@@ -41,6 +45,25 @@ The same loop also ran through the web app with fresh accounts (`e2e/`): the min
 
 NEAR Intents has no testnet, so on testnet the host's output goes to a stand-in deposit address and there is no USDC leg. The demo payout comes from the miner's own testnet wallet, standing in for a pool.
 
+## Screens
+
+Every screen reads live state from the contract, Bitcoin and NEAR. Nothing is sample data.
+
+| Miner home | Host bill | Live proof |
+|---|---|---|
+| ![Miner home: payout address, open bill, history](docs/screens/miner-home.webp) | ![Host bill detail: paid split and lifecycle](docs/screens/host-bill.webp) | ![Proof page: every check passing](docs/screens/proof.webp) |
+
+| Route | Who | What |
+|---|---|---|
+| `/` | Anyone | What Rigbill does, with the latest paid bill and the refusals read live |
+| `/miner` | Miner | Set up a payout address, see the open bill, accept bills, try a sweep and watch it get refused |
+| `/miner/bills/:id` | Miner | Accept a bill with a ceiling, follow it to paid |
+| `/host` | Host | Issue bills, see what each one needs next |
+| `/host/bills/:id` | Host | Lock a live 1Click quote, confirm paid or report a refund |
+| `/proof` | Anyone | The `npm run verify` checks, run in the browser |
+
+Sign in with any NEAR wallet that supports testnet through NEAR Connect, such as Meteor, Intear or Nightly.
+
 ## Run it
 
 Web app (testnet by default, `VITE_NETWORK=mainnet` for mainnet):
@@ -62,6 +85,8 @@ NETWORK=testnet npm run relayer -- address <miner.testnet>
 ```bash
 NETWORK=testnet npm run relayer -- split <miner.testnet> --dry-run
 ```
+
+`--dry-run` builds and prints the split without signing. It needs at least one confirmed payout at the miner's payout address.
 
 ```bash
 NETWORK=testnet npm run relayer -- status <miner.testnet>
@@ -87,9 +112,18 @@ cd contract && cargo test
 |---|---|
 | `contract/` | NEAR contract: miners, bills, quotes, split rules, BIP143 sighash, outpoint registry, MPC calls |
 | `relayer/` | CLI: derive, split, verify signatures, broadcast, 1Click deposit and status, `verify` |
-| `web/` | Miner and host views with NEAR wallet sign-in |
+| `web/` | Landing, miner and host screens, live proof page, NEAR Connect sign-in |
 | `proof/` | Refusal transactions that `npm run verify` checks |
 | `e2e/` | Browser end-to-end test of the web app on testnet |
+
+## Hackathon
+
+Built at NEAR HACKATHON in the Real-World Money track (`realworld`): an invoicing and payment rail a mining host could use with its clients, settled in stablecoins.
+
+- Everything in this repository was written during the event, starting 2026-11-12.
+- NEAR features used: a contract on NEAR, Chain Signatures (`v1.signer`) as the only key to the Bitcoin payout address, and NEAR Intents 1Click for BTC to USDC on Base.
+- What is proven: the whole loop on NEAR testnet and Bitcoin testnet4, including MPC signing, the bill lifecycle and the on-chain refusals. `npm run verify` and CI check it on every commit.
+- What needs mainnet: the 1Click swap and the USDC delivery, because NEAR Intents has no testnet. That code path is built and follows 1Click's published API, but has not settled a real swap yet.
 
 ## Limits
 
