@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { getBillsForMiner, type Bill } from "./near";
 import { btcPriceUsd, usdToSats } from "./oneclick";
-import { ErrorBox, StatusTag } from "./ui";
-import { explain, fmtDate, fromNs, msg, sats, usd, type Load } from "./format";
+import { ErrorBox, StatusTag, ErrorNote } from "./ui";
+import { fmtDate, fromNs, msg, sats, usd, type Load } from "./format";
 import { callContract } from "./wallet";
 import { SplitStatus } from "./SplitStatus";
 
@@ -48,7 +48,7 @@ function BillRow({ bill, canAccept, onDone }: { bill: Bill; canAccept: boolean; 
   const [ceiling, setCeiling] = useState<string>("");
   const [price, setPrice] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const cents = Number(bill.usd_cents);
 
   useEffect(() => {
@@ -71,7 +71,7 @@ function BillRow({ bill, canAccept, onDone }: { bill: Bill; canAccept: boolean; 
       await callContract("accept_bill", { bill_id: bill.id, ceiling_sats: String(n) }, 0n, 30n);
       onDone();
     } catch (e) {
-      setError(explain(e));
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -109,7 +109,7 @@ function BillRow({ bill, canAccept, onDone }: { bill: Bill; canAccept: boolean; 
             The host can't lock a quote above this. Once accepted, you can't cancel the bill. It releases when paid or 7
             days after the due date.
           </p>
-          {error && <p className="err">{error}</p>}
+          {error != null && <ErrorNote error={error} />}
           <button onClick={accept} disabled={busy}>
             {busy ? "Waiting for wallet..." : "Accept bill"}
           </button>

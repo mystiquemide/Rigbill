@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { SPLIT_STORAGE_DEPOSIT } from "./config";
 import { getUtxos, type Utxo } from "./esplora";
-import { explain, sats } from "./format";
+import { sats } from "./format";
 import { getOpenBill, type Bill, type Miner } from "./near";
+import { ErrorNote } from "./ui";
 import { callContract } from "./wallet";
 
 const MAX_INPUTS = 4;
@@ -18,7 +19,7 @@ export function SweepButton({ account, miner, payoutAddress }: { account: string
   const [bill, setBill] = useState<Bill | null>(null);
   const [utxos, setUtxos] = useState<Utxo[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     getOpenBill(account).then(setBill).catch(() => setBill(null));
@@ -46,7 +47,7 @@ export function SweepButton({ account, miner, payoutAddress }: { account: string
         300n,
       );
     } catch (e) {
-      setError(explain(e));
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -66,7 +67,7 @@ export function SweepButton({ account, miner, payoutAddress }: { account: string
           {busy ? "Waiting for wallet..." : `Sweep ${sats(coldValue)} to cold`}
         </button>
       )}
-      {error && <p className="err">{error}</p>}
+      {error != null && <ErrorNote error={error} />}
     </section>
   );
 }

@@ -3,8 +3,8 @@ import { coldAddressError, payoutFromDerivedKey } from "./btc";
 import { BILL_STORAGE_DEPOSIT, network } from "./config";
 import { derivedPublicKey, getBillsForHost, getMiner, type Bill } from "./near";
 import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, usdToSats, type Quote } from "./oneclick";
-import { ErrorBox, StatusTag } from "./ui";
-import { explain, fmtDate, fmtTime, fromNs, msg, sats, toNs, usd, type Load } from "./format";
+import { ErrorBox, StatusTag, ErrorNote } from "./ui";
+import { fmtDate, fmtTime, fromNs, msg, sats, toNs, usd, type Load } from "./format";
 import { callContract } from "./wallet";
 import { SplitStatus } from "./SplitStatus";
 
@@ -51,7 +51,7 @@ function IssueForm({ onDone }: { onDone: () => void }) {
   const [price, setPrice] = useState<number | null>(null);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     btcPriceUsd().then(setPrice).catch(() => setPrice(null));
@@ -89,7 +89,7 @@ function IssueForm({ onDone }: { onDone: () => void }) {
       setTouched(false);
       onDone();
     } catch (err) {
-      setError(explain(err));
+      setError(err);
     } finally {
       setBusy(false);
     }
@@ -116,7 +116,7 @@ function IssueForm({ onDone }: { onDone: () => void }) {
       <label>Your Base address for USDC<input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x..." spellCheck={false} /></label>
       {show("addr")}
       <p className="small muted">Issuing locks 0.01 NEAR for storage. The bill does nothing until the miner accepts it.</p>
-      {error && <p className="err">{error}</p>}
+      {error != null && <ErrorNote error={error} />}
       <button type="submit" disabled={busy}>{busy ? "Waiting for wallet..." : "Issue bill"}</button>
     </form>
   );
@@ -124,7 +124,7 @@ function IssueForm({ onDone }: { onDone: () => void }) {
 
 function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [now] = useState(() => Date.now());
   const quoteExpired = bill.quote && fromNs(bill.quote.deadline_ns).getTime() <= now;
   const needsQuote = bill.status === "Accepted" || (bill.status === "QuoteApproved" && quoteExpired);
@@ -136,7 +136,7 @@ function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
       await callContract(method, { bill_id: bill.id }, 0n, 30n);
       onDone();
     } catch (e) {
-      setError(explain(e));
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -181,7 +181,7 @@ function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
         </div>
       )}
       {needsQuote && <ApproveQuote bill={bill} onDone={onDone} />}
-      {error && <p className="err">{error}</p>}
+      {error != null && <ErrorNote error={error} />}
     </div>
   );
 }
@@ -190,7 +190,7 @@ function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [standin, setStandin] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const ceiling = Number(bill.ceiling_sats ?? 0);
   const cents = Number(bill.usd_cents);
   const testnet = network === "testnet";
@@ -238,7 +238,7 @@ function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
       );
       onDone();
     } catch (e) {
-      setError(explain(e));
+      setError(e);
     } finally {
       setBusy(null);
     }
@@ -286,7 +286,7 @@ function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
           </div>
         </>
       )}
-      {error && <p className="err">{error}</p>}
+      {error != null && <ErrorNote error={error} />}
     </div>
   );
 }

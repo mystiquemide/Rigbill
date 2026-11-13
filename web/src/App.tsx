@@ -11,9 +11,9 @@ import {
 } from "./config";
 import { getTipHeight, getUtxos, type Utxo } from "./esplora";
 import { derivedPublicKey, getMiner, type Miner } from "./near";
-import { callContract, wallet } from "./wallet";
-import { ErrorBox } from "./ui";
-import { explain, msg, sats, type Load } from "./format";
+import { callContract, signIn as connect, signOut as disconnect, watchAccount } from "./wallet";
+import { ErrorBox, ErrorNote } from "./ui";
+import { msg, sats, type Load } from "./format";
 import { MinerBills } from "./MinerBills";
 import { HostView } from "./HostView";
 import { SweepButton } from "./SweepButton";
@@ -23,20 +23,13 @@ import { TxBanner } from "./TxBanner";
 export default function App() {
   const [account, setAccount] = useState<string | null | undefined>(undefined);
 
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    wallet().then(({ selector }) => {
-      const read = () => setAccount(selector.store.getState().accounts.find((a) => a.active)?.accountId ?? null);
-      read();
-      unsub = selector.store.observable.subscribe(read).unsubscribe;
-    }).catch(() => setAccount(null));
-    return () => unsub?.();
-  }, []);
+  useEffect(() => watchAccount(setAccount), []);
 
-  const signIn = async () => (await wallet()).modal.show();
-  const signOut = async () => {
-    const { selector } = await wallet();
-    await (await selector.wallet()).signOut();
+  const signIn = () => {
+    connect().catch(() => {});
+  };
+  const signOut = () => {
+    disconnect().catch(() => {});
   };
 
   return (
@@ -258,7 +251,7 @@ function RegisterForm({
   const [cap, setCap] = useState(String(initial ? Number(initial.fee_cap_sats) : DEFAULT_FEE_CAP));
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   const addrErr = coldAddressError(cold);
   const capNum = Number(cap);
@@ -278,7 +271,7 @@ function RegisterForm({
       );
       onDone();
     } catch (err) {
-      setError(explain(err));
+      setError(err);
     } finally {
       setBusy(false);
     }
@@ -301,7 +294,7 @@ function RegisterForm({
         Whatever isn't owed to your host goes to this address. The contract refuses any split whose network fee is above
         your cap.{!initial && " Registering locks 0.01 NEAR for storage."}
       </p>
-      {error && <p className="err">{error}</p>}
+      {error != null && <ErrorNote error={error} />}
       <div className="row">
         <button type="submit" disabled={busy}>{busy ? "Waiting for wallet..." : initial ? "Save" : "Register"}</button>
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>Cancel</button>}

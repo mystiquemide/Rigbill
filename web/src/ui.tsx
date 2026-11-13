@@ -1,4 +1,7 @@
+import { NEARBLOCKS_WEB } from "./config";
+import { explain } from "./format";
 import type { BillStatus } from "./near";
+import { ContractRefusal } from "./wallet";
 
 const LABELS: Record<BillStatus, string> = {
   Issued: "Waiting for miner",
@@ -21,5 +24,20 @@ export function ErrorBox({ what, error, retry }: { what: string; error: string; 
       <p className="mono small">{error}</p>
       {retry && <button className="ghost" onClick={retry}>Try again</button>}
     </section>
+  );
+}
+
+/** A failed action: the rule it hit, plus a nearblocks link when the contract refused on chain. */
+export function ErrorNote({ error }: { error: unknown }) {
+  return (
+    <p className="err">
+      {explain(error)}
+      {error instanceof ContractRefusal && error.hash && (
+        <>
+          {" "}
+          <a href={`${NEARBLOCKS_WEB}/txns/${error.hash}`} target="_blank" rel="noreferrer">View on nearblocks</a>
+        </>
+      )}
+    </p>
   );
 }
