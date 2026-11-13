@@ -82,10 +82,9 @@ button.ghost:hover, .btn-dark:hover { background: var(--dark-hover); border-colo
 .site-nav nav { display: flex; align-items: center; gap: 32px; }
 .site-nav nav a:not(.btn) { color: var(--muted); font-size: 15px; }
 .site-nav nav a:not(.btn):hover { color: var(--text); text-decoration: none; }
-.logo { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font: 600 26px/1 var(--display); font-stretch: 100%; letter-spacing: -.03em; }
+.logo { display: inline-flex; align-items: center; gap: 11px; color: var(--text); font: 600 26px/1 var(--display); font-stretch: 100%; letter-spacing: -.03em; }
 .logo:hover { text-decoration: none; }
-.logo-mark { display: inline-flex; align-items: flex-end; gap: 3px; height: 26px; }
-.logo-mark i { width: 5px; background: var(--lime); border-radius: 1px; }
+.logo-mark { flex: none; display: block; }
 .hero { position: relative; background: var(--ground) url("/hero-mining-facility.jpg") center / cover no-repeat; }
 @supports (background-image: url("x.webp")) { .hero { background-image: image-set(url("/hero-mining-facility.webp") type("image/webp"), url("/hero-mining-facility.jpg") type("image/jpeg")); } }
 .hero::before { content: ""; position: absolute; inset: 0; background: #141d0873; }
@@ -179,7 +178,7 @@ button.ghost:hover, .btn-dark:hover { background: var(--dark-hover); border-colo
 /* App screens (restyled now, rebuilt screen by screen next) */
 .page { max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; }
 .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
-.brand { font-weight: 600; font-size: 22px; letter-spacing: -0.02em; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .net { font: 400 11px/1 var(--mono); text-transform: uppercase; color: var(--review); border: 1px solid #9dbced59; border-radius: 6px; padding: 5px 8px; margin-left: 8px; vertical-align: middle; }
 .who { display: flex; align-items: center; gap: 10px; }
 .card { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r-panel); padding: 24px; margin-bottom: 16px; }

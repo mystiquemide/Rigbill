@@ -19,6 +19,7 @@ import { HostView } from "./HostView";
 import { SweepButton } from "./SweepButton";
 import { TxBanner } from "./TxBanner";
 import { navigate } from "./routing";
+import { Logo } from "./Landing";
 
 
 export default function App() {
@@ -37,7 +38,7 @@ export default function App() {
     <div className="page">
       <header className="top">
         <div className="brand">
-          Rigbill <span className="net">{network}</span>
+          <Logo /> <span className="net">{network}</span>
         </div>
         {account ? (
           <div className="who">
