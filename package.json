@@ -1,0 +1,8 @@
+{
+  "name": "rigbill",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "verify": "npm --prefix relayer ci --silent --no-audit --no-fund && NETWORK=${NETWORK:-testnet} npm --prefix relayer run --silent verify"
+  }
+}

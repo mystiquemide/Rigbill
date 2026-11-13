@@ -8,7 +8,8 @@
   "scripts": {
     "relayer": "tsx src/cli.ts",
     "test": "NETWORK=mainnet tsx --test test/*.test.ts",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "verify": "tsx src/verify.ts"
   },
   "license": "MIT",
   "dependencies": {

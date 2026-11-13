@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 470" font-family="Inter, system-ui, sans-serif" font-size="13">
+  <title>Rigbill architecture</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1b1b18"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #1b1b18; stroke-width: 1.4; }
+      .core { fill: #eaf2ec; stroke: #1f5f3f; stroke-width: 1.8; }
+      .chain { fill: #f6f5f1; stroke: #6b6a63; stroke-width: 1.2; stroke-dasharray: 4 3; }
+      .t { fill: #1b1b18; font-weight: 600; }
+      .s { fill: #6b6a63; font-size: 11.5px; }
+      .l { fill: #1b1b18; font-size: 11.5px; }
+      .ln { stroke: #1b1b18; stroke-width: 1.2; fill: none; marker-end: url(#a); }
+    </style>
+  </defs>
+  <rect width="920" height="470" fill="#fbfaf7"/>
+
+  <rect class="box" x="20" y="30" width="170" height="64" rx="8"/>
+  <text class="t" x="35" y="56">Mining pool</text>
+  <text class="s" x="35" y="76">pays BTC to an address</text>
+
+  <rect class="chain" x="270" y="20" width="260" height="84" rx="8"/>
+  <text class="t" x="285" y="46">Payout address (Bitcoin)</text>
+  <text class="s" x="285" y="66">derived from v1.rigbill + miner path</text>
+  <text class="s" x="285" y="84">no person or server holds its key</text>
+
+  <rect class="box" x="20" y="170" width="170" height="64" rx="8"/>
+  <text class="t" x="35" y="196">Miner</text>
+  <text class="s" x="35" y="216">cold address, fee cap, accepts bill</text>
+
+  <rect class="box" x="20" y="300" width="170" height="64" rx="8"/>
+  <text class="t" x="35" y="326">Host</text>
+  <text class="s" x="35" y="346">issues bill, locks a 1Click quote</text>
+
+  <rect class="core" x="270" y="170" width="260" height="194" rx="10"/>
+  <text class="t" x="285" y="196">Rigbill contract (NEAR)</text>
+  <text class="l" x="285" y="222">bills, quotes, outpoint registry</text>
+  <text class="l" x="285" y="244">builds the BIP143 sighash itself</text>
+  <text class="l" x="285" y="266">signs only if outputs are exactly:</text>
+  <text class="l" x="297" y="288">1. approved 1Click deposit, quoted sats</text>
+  <text class="l" x="297" y="308">2. miner's cold address, the rest</text>
+  <text class="l" x="285" y="332">anything else is refused on chain</text>
+
+  <rect class="box" x="620" y="170" width="190" height="64" rx="8"/>
+  <text class="t" x="635" y="196">v1.signer (NEAR MPC)</text>
+  <text class="s" x="635" y="216">Chain Signatures, ECDSA</text>
+
+  <rect class="box" x="620" y="30" width="190" height="64" rx="8"/>
+  <text class="t" x="635" y="56">Relayer (anyone)</text>
+  <text class="s" x="635" y="76">builds, verifies, broadcasts</text>
+
+  <rect class="box" x="620" y="300" width="190" height="64" rx="8"/>
+  <text class="t" x="635" y="326">NEAR Intents 1Click</text>
+  <text class="s" x="635" y="346">BTC to USDC on Base</text>
+
+  <rect class="chain" x="620" y="398" width="190" height="52" rx="8"/>
+  <text class="t" x="635" y="420">Host's Base address</text>
+  <text class="s" x="635" y="438">receives the bill in USDC</text>
+
+  <rect class="chain" x="270" y="398" width="260" height="52" rx="8"/>
+  <text class="t" x="285" y="420">Miner's cold wallet</text>
+  <text class="s" x="285" y="438">everything not owed to the host</text>
+
+  <path class="ln" d="M190,62 L268,62"/>
+  <path class="ln" d="M190,202 L268,202"/>
+  <path class="ln" d="M190,332 L268,332"/>
+  <path class="ln" d="M530,196 L618,196"/>
+  <text class="l" x="538" y="188">sign(sighash)</text>
+  <path class="ln" d="M620,222 L532,222"/>
+  <text class="l" x="538" y="240">signatures</text>
+  <path class="ln" d="M660,94 L505,168"/>
+  <text class="l" x="590" y="122">sign_split</text>
+  <path class="ln" d="M620,62 L532,62"/>
+  <text class="l" x="545" y="54">broadcast</text>
+  <path class="ln" d="M530,96 L575,96 L575,322 L618,322"/>
+  <text class="l" x="582" y="290">output 1</text>
+  <path class="ln" d="M280,104 L240,104 L240,424 L268,424"/>
+  <text class="l" x="200" y="400">output 2</text>
+  <path class="ln" d="M715,364 L715,396"/>
+</svg>

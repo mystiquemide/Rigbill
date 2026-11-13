@@ -1,0 +1,25 @@
+{
+  "network": "testnet",
+  "contract": "v1.rigbill.testnet",
+  "miner": "rigbill.testnet",
+  "refusals": [
+    {
+      "tx": "B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J",
+      "sender": "rigbill.testnet",
+      "attempt": "Send everything to cold while bill 1 is open",
+      "expect": "BILL_OPEN_HOST_OUTPUT_REQUIRED"
+    },
+    {
+      "tx": "3m3KTFmSdhyLvfdDWsk68nUaAUPxwbpt6G6HLLKoXUy5",
+      "sender": "rigbill.testnet",
+      "attempt": "Add a third output to an unrelated address",
+      "expect": "OUTPUT_NOT_ALLOWED"
+    },
+    {
+      "tx": "6qv2g2Uk1P6AmE3SdptprKu8kJ8T5UMDxGyGA9GiGUmQ",
+      "sender": "rigbill.testnet",
+      "attempt": "Spend a payout that split 0 already signed",
+      "expect": "OUTPOINT_ALREADY_SIGNED"
+    }
+  ]
+}

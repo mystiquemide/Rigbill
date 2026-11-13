@@ -10,7 +10,7 @@ export const CONTRACT_ID = process.env.RIGBILL_CONTRACT || (testnet ? "v1.rigbil
 export const SIGNER_ID = process.env.MPC_SIGNER || (testnet ? "v1.signer-prod.testnet" : "v1.signer");
 export const NEAR_RPC_URL = process.env.NEAR_RPC_URL || (testnet ? "https://rpc.testnet.near.org" : "https://rpc.mainnet.near.org");
 export const ESPLORA_URLS = (
-  process.env.ESPLORA_URL ??
+  process.env.ESPLORA_URL ||
   (testnet
     ? "https://blockstream.info/testnet4/api,https://mempool.space/testnet4/api"
     : "https://mempool.space/api,https://blockstream.info/api")
