@@ -18,6 +18,7 @@ import { MinerBills } from "./MinerBills";
 import { HostView } from "./HostView";
 import { SweepButton } from "./SweepButton";
 import { TxBanner } from "./TxBanner";
+import { navigate } from "./routing";
 
 
 export default function App() {
@@ -64,11 +65,8 @@ export default function App() {
 }
 
 function RoleSwitch({ account }: { account: string }) {
-  const [role, setRole] = useState<"miner" | "host">(location.hash === "#host" ? "host" : "miner");
-  const pick = (r: "miner" | "host") => {
-    setRole(r);
-    history.replaceState(null, "", r === "host" ? "#host" : "#miner");
-  };
+  const role: "miner" | "host" = location.pathname.startsWith("/host") ? "host" : "miner";
+  const pick = (r: "miner" | "host") => navigate(r === "host" ? "/host" : "/miner");
   return (
     <>
       <nav className="tabs" role="tablist">
