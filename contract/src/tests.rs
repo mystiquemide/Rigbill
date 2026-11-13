@@ -54,6 +54,8 @@ fn registered() -> Rigbill {
         vec![PromiseResult::Successful(derived_key_json())],
     );
     c.on_derived_key(miner_id());
+    set_ctx(miner_id(), NearToken::from_near(0), vec![]);
+    c.set_relayers(vec!["relayer.near".parse().unwrap()]);
     c
 }
 
@@ -913,4 +915,130 @@ fn paying_bill_expires_after_grace() {
     at(host_id(), NearToken::from_near(0), after);
     assert_eq!(c.expire_bill(id), BillStatus::Expired);
     assert!(c.get_open_bill(miner_id()).is_none());
+}
+
+// Caller authorization and release (sign_split freeze fix).
+
+fn sign_as(c: &mut Rigbill, who: &str, inputs: Vec<InputArg>, outputs: Vec<OutputArg>) {
+    set_ctx(
+        who.parse().unwrap(),
+        SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(inputs.len() as u128)),
+        vec![],
+    );
+    let _ = c.sign_split(miner_id(), inputs, outputs);
+}
+
+fn sign_ok(c: &mut Rigbill, split_id: u64) {
+    set_ctx(
+        contract_id(),
+        NearToken::from_near(0),
+        vec![PromiseResult::Successful(b"{}".to_vec())],
+    );
+    c.on_signed(U64(split_id));
+}
+
+#[test]
+#[should_panic(expected = "NOT_AUTHORIZED")]
+fn stranger_cannot_request_signatures() {
+    let mut c = registered();
+    sign_as(&mut c, "attacker.near", vec![input(TXID_A, 0, 999_999)], vec![output(COLD, 999_000)]);
+}
+
+#[test]
+fn miner_can_request_signatures_directly() {
+    let mut c = registered();
+    sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+    assert_eq!(c.get_split(U64(0)).unwrap().status, SplitStatus::Requested);
+}
+
+#[test]
+#[should_panic(expected = "NOT_AUTHORIZED")]
+fn removed_relayer_is_refused() {
+    let mut c = registered();
+    set_ctx(miner_id(), NearToken::from_near(0), vec![]);
+    c.set_relayers(vec![]);
+    assert!(c.get_relayers(miner_id()).is_empty());
+    split(&mut c, vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+}
+
+#[test]
+#[should_panic(expected = "TOO_MANY_RELAYERS")]
+fn relayer_list_is_capped() {
+    let mut c = registered();
+    set_ctx(miner_id(), NearToken::from_near(0), vec![]);
+    c.set_relayers(
+        ["a.near", "b.near", "c.near", "d.near"].iter().map(|a| a.parse().unwrap()).collect(),
+    );
+}
+
+#[test]
+fn miner_releases_a_wrong_value_split_and_splits_again() {
+    let mut c = registered();
+    // A split signed over a wrong input value can never be broadcast.
+    sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 999_999)], vec![output(COLD, 999_000)]);
+    sign_ok(&mut c, 0);
+    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
+    set_ctx(miner_id(), NearToken::from_near(0), vec![]);
+    c.release_split(U64(0));
+    assert_eq!(c.get_split(U64(0)).unwrap().status, SplitStatus::Released);
+    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
+    sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(1)));
+}
+
+#[test]
+#[should_panic(expected = "NOT_MINER")]
+fn only_miner_releases() {
+    let mut c = registered();
+    sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+    sign_ok(&mut c, 0);
+    set_ctx("relayer.near".parse().unwrap(), NearToken::from_near(0), vec![]);
+    c.release_split(U64(0));
+}
+
+#[test]
+#[should_panic(expected = "BAD_SPLIT_STATE")]
+fn cannot_release_a_pending_split() {
+    let mut c = registered();
+    sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+    set_ctx(miner_id(), NearToken::from_near(0), vec![]);
+    c.release_split(U64(0));
+}
+
+#[test]
+fn host_of_the_open_bill_can_request_signatures() {
+    let (mut c, id) = quoted(T0);
+    let n = 1u128;
+    at(host_id(), SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(n)), T0);
+    let _ = c.sign_split(
+        miner_id(),
+        vec![input(TXID_A, 0, 300_000)],
+        vec![output(DEPOSIT_ADDR, 200_000), output(COLD, 98_000)],
+    );
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Paying);
+}
+
+#[test]
+fn release_returns_unpaid_bill_to_its_quote() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    sign_ok(&mut c, 0);
+    at(miner_id(), NearToken::from_near(0), T0);
+    c.release_split(U64(0));
+    let b = c.get_bill(id).unwrap();
+    assert_eq!(b.status, BillStatus::QuoteApproved);
+    assert_eq!(b.split_id, None);
+    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
+}
+
+#[test]
+#[should_panic(expected = "BILL_ALREADY_PAID")]
+fn cannot_release_the_split_that_paid_a_bill() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    sign_ok(&mut c, 0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.confirm_paid(id);
+    at(miner_id(), NearToken::from_near(0), T0);
+    c.release_split(U64(0));
 }

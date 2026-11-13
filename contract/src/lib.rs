@@ -60,6 +60,8 @@ pub enum SplitStatus {
     Requested,
     Signed,
     Failed,
+    /// Signed, then released by the miner because it was never broadcast.
+    Released,
 }
 
 #[near(serializers = [borsh, json])]
@@ -211,6 +213,22 @@ fn compress(xy: &[u8]) -> Vec<u8> {
     out
 }
 
+const MAX_RELAYERS: usize = 3;
+
+fn relayers_key(miner: &AccountId) -> Vec<u8> {
+    let mut k = b"relayers:".to_vec();
+    k.extend_from_slice(miner.as_bytes());
+    k
+}
+
+impl Rigbill {
+    fn relayers_of(&self, miner: &AccountId) -> Vec<AccountId> {
+        env::storage_read(&relayers_key(miner))
+            .and_then(|v| near_sdk::borsh::from_slice(&v).ok())
+            .unwrap_or_default()
+    }
+}
+
 pub fn payout_path(miner: &AccountId) -> String {
     format!("miner/{miner}")
 }
@@ -320,6 +338,20 @@ impl Rigbill {
             .as_ref()
             .and_then(|v| v.as_slice().try_into().ok())
             .unwrap_or_else(|| fail("MINER_NOT_REGISTERED"));
+
+        // Only the miner, the open bill's host, or a relayer the miner approved
+        // may request signatures. Anyone else could reserve a payout's outpoint
+        // with a wrong input value and freeze it.
+        let caller = env::predecessor_account_id();
+        let open_host = self
+            .current_open_bill(&miner)
+            .and_then(|id| self.bills.get(&id).map(|b| b.host.clone()));
+        if caller != miner
+            && open_host.as_ref() != Some(&caller)
+            && !self.relayers_of(&miner).contains(&caller)
+        {
+            fail("NOT_AUTHORIZED");
+        }
 
         if inputs.is_empty() || inputs.len() > MAX_INPUTS {
             fail("TOO_MANY_INPUTS");
@@ -535,6 +567,68 @@ impl Rigbill {
         ));
         self.splits.insert(split_id.0, split);
         status
+    }
+
+    /// The miner approves up to three relayers that may call `sign_split`
+    /// for them. Kept outside the root struct so existing state still loads.
+    pub fn set_relayers(&mut self, relayers: Vec<AccountId>) {
+        let miner = env::predecessor_account_id();
+        if !self.miners.contains_key(&miner) {
+            fail("MINER_NOT_REGISTERED");
+        }
+        if relayers.len() > MAX_RELAYERS {
+            fail("TOO_MANY_RELAYERS");
+        }
+        let key = relayers_key(&miner);
+        if relayers.is_empty() {
+            env::storage_remove(&key);
+        } else {
+            env::storage_write(&key, &near_sdk::borsh::to_vec(&relayers).unwrap());
+        }
+    }
+
+    pub fn get_relayers(&self, miner: AccountId) -> Vec<AccountId> {
+        self.relayers_of(&miner)
+    }
+
+    /// The miner frees the outpoints of a signed split that was never
+    /// broadcast, for example one requested with a wrong input value, so
+    /// the payout can be split again. An unpaid bill goes back to its quote.
+    pub fn release_split(&mut self, split_id: U64) {
+        let mut split = self
+            .splits
+            .get(&split_id.0)
+            .cloned()
+            .unwrap_or_else(|| fail("SPLIT_NOT_FOUND"));
+        if split.miner != env::predecessor_account_id() {
+            fail("NOT_MINER");
+        }
+        if split.status != SplitStatus::Signed {
+            fail("BAD_SPLIT_STATE");
+        }
+        if let Some(id) = split.bill_id {
+            let b = self.bill_mut(id.0);
+            if b.status == bills::BillStatus::Paid {
+                fail("BILL_ALREADY_PAID");
+            }
+            if b.status == bills::BillStatus::Paying && b.split_id == Some(split_id) {
+                b.status = bills::BillStatus::QuoteApproved;
+                b.split_id = None;
+            }
+        }
+        for i in &split.inputs {
+            let k = outpoint_key(&parse_txid(&i.txid), i.vout);
+            if self.outpoints.get(&k) == Some(&split_id.0) {
+                self.outpoints.remove(&k);
+            }
+        }
+        split.status = SplitStatus::Released;
+        env::log_str(&format!(
+            "EVENT_JSON:{}",
+            json!({"standard":"rigbill","version":"1.0.0","event":"split_released",
+                   "data":[{"split_id": split_id, "txid": split.txid}]})
+        ));
+        self.splits.insert(split_id.0, split);
     }
 
     pub fn get_miner(&self, miner: AccountId) -> Option<Miner> {
