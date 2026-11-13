@@ -16,6 +16,8 @@ import { ErrorBox } from "./ui";
 import { explain, msg, sats, type Load } from "./format";
 import { MinerBills } from "./MinerBills";
 import { HostView } from "./HostView";
+import { SweepButton } from "./SweepButton";
+import { TxBanner } from "./TxBanner";
 
 
 export default function App() {
@@ -55,6 +57,7 @@ export default function App() {
 
       {account === undefined && <p className="muted">Loading wallet...</p>}
       {account === null && <Intro onSignIn={signIn} />}
+      {account && <TxBanner account={account} />}
       {account && <RoleSwitch account={account} />}
 
       <footer className="foot muted">
@@ -132,6 +135,7 @@ function MinerView({ account }: { account: string }) {
             <PayoutCard payout={payout} pending={!m.payout_pubkey} onRetry={refresh} />
           )}
           <MinerBills account={account} />
+          {payout.state === "ok" && <SweepButton account={account} miner={m} payoutAddress={payout.data.address} />}
           {payout.state === "ok" && <Balance address={payout.data.address} />}
           <Settings miner={m} onDone={refresh} />
         </>

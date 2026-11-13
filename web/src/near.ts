@@ -66,3 +66,31 @@ export interface Split {
 }
 
 export const getSplit = (id: string) => view<Split | null>(CONTRACT_ID, "get_split", { split_id: id });
+
+export const getOpenBill = (miner: string) => view<Bill | null>(CONTRACT_ID, "get_open_bill", { miner });
+
+export interface TxResult {
+  ok: boolean;
+  /** Contract error text, e.g. "Smart contract panicked: OUTPUT_NOT_ALLOWED". */
+  failure: string | null;
+}
+
+/** Final status of a NEAR transaction, read from RPC rather than trusted from the wallet. */
+export async function txResult(hash: string, sender: string): Promise<TxResult> {
+  const res = await fetch(NEAR_RPC, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: "rigbill", method: "tx", params: { tx_hash: hash, sender_account_id: sender, wait_until: "FINAL" } }),
+  });
+  const body = await res.json();
+  if (body.error) throw new Error(body.error?.cause?.name ?? "NEAR RPC error");
+  const outcomes = [body.result.transaction_outcome, ...body.result.receipts_outcome];
+  for (const o of outcomes) {
+    const f = o?.outcome?.status?.Failure;
+    if (f) {
+      const exec = f?.ActionError?.kind?.FunctionCallError?.ExecutionError;
+      return { ok: false, failure: exec ? String(exec) : JSON.stringify(f) };
+    }
+  }
+  return { ok: true, failure: null };
+}

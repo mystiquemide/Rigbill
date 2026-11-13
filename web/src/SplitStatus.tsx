@@ -26,8 +26,8 @@ const SWAP_LABEL: Record<string, string> = {
 export function SplitStatus({ bill }: { bill: Bill }) {
   const [s, setS] = useState<State | null>(null);
 
-  const load = useCallback(async () => {
-    if (!bill.split_id) return;
+  const fetchState = useCallback(async (): Promise<State | null> => {
+    if (!bill.split_id) return null;
     const errors: string[] = [];
     const split = await getSplit(bill.split_id).catch((e) => (errors.push(`contract: ${msg(e)}`), null));
     let btc: State["btc"] = null;
@@ -36,19 +36,24 @@ export function SplitStatus({ bill }: { bill: Bill }) {
         const [st, tip] = await Promise.all([getTxStatus(split.txid), getTipHeight()]);
         btc = { inMempool: st.inMempool, confirmations: st.confirmed && st.block_height ? tip - st.block_height + 1 : 0 };
       } catch (e) {
-        errors.push(`mempool.space: ${msg(e)}`);
+        errors.push(`chain: ${msg(e)}`);
       }
     }
     let swap: SwapStatusResponse | null = null;
     if (network === "mainnet" && bill.quote) {
       swap = await swapStatus(bill.quote.deposit_address).catch((e) => (errors.push(`1Click: ${msg(e)}`), null));
     }
-    setS({ split, btc, swap, errors });
+    return { split, btc, swap, errors };
   }, [bill.split_id, bill.quote]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let alive = true;
+    fetchState().then((st) => alive && setS(st));
+    return () => {
+      alive = false;
+    };
+  }, [fetchState]);
+  const load = () => fetchState().then(setS);
 
   if (!bill.split_id) return null;
   if (!s) return <div className="small muted">Loading payment status...</div>;

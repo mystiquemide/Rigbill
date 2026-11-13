@@ -20,6 +20,11 @@ const RULES: Record<string, string> = {
   BAD_ADDRESS: "Refused: the contract rejected that address.",
   BAD_DUE_DATE: "Refused: the due date must be in the future.",
   BILL_OPEN_HOST_OUTPUT_REQUIRED: "Refused: a bill is open, so this payout must pay it first.",
+  OUTPUT_NOT_ALLOWED: "Refused: the split can only pay the approved deposit address and your cold wallet.",
+  OUTPUT_AMOUNT_MISMATCH: "Refused: the host output must be exactly the approved quote amount.",
+  OUTPOINT_ALREADY_SIGNED: "Refused: one of these coins was already signed for in another split.",
+  FEE_OVER_CAP: "Refused: the network fee is above the miner's fee cap.",
+  DUST_OUTPUT: "Refused: an output would be below Bitcoin's dust limit.",
 };
 
 export function explain(e: unknown): string {
