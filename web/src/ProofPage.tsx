@@ -48,7 +48,7 @@ export default function ProofPage() {
           <div className="block-head">
             <div>
               <p className="kicker">Live proof, read in your browser</p>
-              <h1 className="h1">Don't trust us. <em>Read the chain.</em></h1>
+              <h1 className="h1">Don't trust us, read the chain</h1>
             </div>
             <div style={{ maxWidth: 460 }}>
               <p className="muted" style={{ margin: "0 0 20px" }}>
@@ -75,7 +75,7 @@ export default function ProofPage() {
                 {rows.length === 0 && <p className="skeleton">Reading NEAR and Bitcoin&hellip;</p>}
                 {rows.map((c, i) => (
                   <div key={i} className="check">
-                    <span className={`chip ${c.ok ? "chip-lime" : "chip-lost"}`} style={{ justifySelf: "start" }}>{c.ok ? "Pass" : "Fail"}</span>
+                    <span className={`led${c.ok ? "" : " bad"}`} aria-label={c.ok ? "Passed" : "Failed"} />
                     <span>{c.label}</span>
                     <span className="detail">{c.href ? <a href={c.href} target="_blank" rel="noreferrer">{c.detail}</a> : c.detail}</span>
                   </div>
@@ -85,7 +85,7 @@ export default function ProofPage() {
           })}
 
           {status === "done" && (
-            <p className="row" style={{ justifyContent: "flex-start", gap: 14 }}>
+            <p className="row" style={{ justifyContent: "flex-start", gap: 12 }}>
               <span className={`chip ${failed ? "chip-lost" : "chip-lime"}`}>{failed ? `${failed} of ${checks.length} checks failed` : `All ${checks.length} checks passed`}</span>
               <a className="arrow-link" href="https://github.com/mystiquemide/Rigbill/blob/main/relayer/src/verify.ts" target="_blank" rel="noreferrer" style={{ fontSize: 14 }}>View the code that runs these checks</a>
             </p>

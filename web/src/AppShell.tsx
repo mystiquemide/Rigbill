@@ -54,7 +54,7 @@ function SignInPrompt({ active, onConnect }: { active: Tab; onConnect: () => voi
   return (
     <section className="panel signin">
       <p className="kicker">{host ? "For hosts" : "For miners"}</p>
-      <h1 className="h2">{host ? <>Bill your miners in dollars. <em>Get USDC on Base.</em></> : <>Set up your payout address. <em>Keep your own keys.</em></>}</h1>
+      <h1 className="h2">{host ? <>Bill your miners in dollars, get USDC on Base</> : <>Set up your payout address and keep your own keys</>}</h1>
       <p className="muted">
         {host
           ? "Sign in with your NEAR wallet to issue bills, lock quotes and confirm payments."

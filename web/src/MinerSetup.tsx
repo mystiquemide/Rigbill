@@ -92,7 +92,7 @@ export default function MinerSetup({ onDone }: { onDone: () => void }) {
     <div className="setup">
       <div>
         <p className="kicker">Step 1 of 2</p>
-        <h1 className="h2">Where should your <em>Bitcoin go?</em></h1>
+        <h1 className="h2">Where should your Bitcoin go?</h1>
         <p className="lead">Everything not owed to your host goes to this wallet. You keep its keys. Rigbill never does.</p>
         <MinerForm onDone={onDone} />
       </div>

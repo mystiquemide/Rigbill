@@ -52,10 +52,10 @@ export default function Landing() {
           <div className="wrap">
             <div className="band">
               <div>
-                <h2>Set up your payout address in two minutes.</h2>
+                <h2>Set up your payout address in two minutes</h2>
                 <p>Sign in with any NEAR wallet, add your cold wallet, and paste the new address into your pool.</p>
               </div>
-              <Link to="/miner" className="btn btn-onlime">Open app</Link>
+              <Link to="/miner" className="btn">Open app</Link>
             </div>
           </div>
         </section>
@@ -86,7 +86,7 @@ function Hero() {
         <div className="hero-copy">
           <p className="kicker" style={{ margin: "0 0 28px" }}>Bitcoin payouts for miners and hosts</p>
           <h1 id="hero-title" className="h1">
-            Your payouts pay the hosting bill. <em>The rest goes to your wallet.</em>
+            Your payouts pay the hosting bill <em>The rest goes to your wallet</em>
           </h1>
           <p>
             A Bitcoin payout address no one holds a key to. A NEAR contract signs only transactions that pay your host
@@ -116,7 +116,7 @@ function LiveBill() {
   if (state.s !== "ok") {
     return (
       <aside className="panel" aria-live="polite">
-        <div className="panel-head"><span className="mono" style={{ color: "var(--lime)" }}>LATEST PAID BILL</span></div>
+        <div className="panel-head"><span className="panel-label">Latest paid bill</span></div>
         <p className="skeleton">
           {state.s === "loading" && "Reading the latest paid bill from the contract and Bitcoin…"}
           {state.s === "error" && "Couldn't reach NEAR or Bitcoin right now. The proof page has every record."}
@@ -131,8 +131,8 @@ function LiveBill() {
   return (
     <aside className="panel" aria-label={`Bill ${bill.id}, paid`}>
       <div className="panel-head">
-        <span className="mono" style={{ color: "var(--lime)" }}>BILL #{bill.id} &middot; PAID</span>
-        <span className="chips"><span className="chip chip-lime">MPC signed</span><span className="chip chip-lime">On-chain rule</span></span>
+        <span className="panel-label">Bill #{bill.id} &middot; paid from a payout</span>
+        <span className="chip chip-lime">Paid</span>
       </div>
       <dl style={{ display: "block", margin: 0 }}>
         <div className="kv"><dt>Bill</dt><dd>{usd(bill.usd_cents)} for {bill.period}</dd></div>
@@ -154,8 +154,8 @@ function LiveBill() {
 
 function Doors() {
   const doors = [
-    { k: "I mine", t: "Keep your coins in your own wallet.", d: "Hosting gets paid on time without you selling by hand every month. Your host can only ever take what you agreed to.", pts: ["Your pool pays one address, nothing else changes", "You set the most a bill can cost in sats", "Everything left over goes straight to your cold wallet"], cta: "Set up payouts", to: "/miner" },
-    { k: "I host miners", t: "Bill in dollars. Get USDC on Base.", d: "No chasing invoices, no 30 day power deposits. While your bill is open, the contract won't release a single payout without paying you first.", pts: ["Bill a miner in USD from the web app", "Lock a live NEAR Intents quote", "USDC lands in your own Base wallet"], cta: "Issue a bill", to: "/host" },
+    { k: "I mine", t: "Keep your coins in your own wallet", d: "Hosting gets paid on time without you selling by hand every month. Your host can only ever take what you agreed to.", pts: ["Your pool pays one address, nothing else changes", "You set the most a bill can cost in sats", "Everything left over goes straight to your cold wallet"], cta: "Set up payouts", to: "/miner" },
+    { k: "I host miners", t: "Bill in dollars, get USDC on Base", d: "No chasing invoices, no 30 day power deposits. While your bill is open, the contract won't release a single payout without paying you first.", pts: ["Bill a miner in USD from the web app", "Lock a live NEAR Intents quote", "USDC lands in your own Base wallet"], cta: "Issue a bill", to: "/host" },
   ];
   return (
     <section id="doors" className="block" aria-labelledby="doors-title">
@@ -163,7 +163,7 @@ function Doors() {
         <div className="block-head">
           <div>
             <p className="kicker">Start where you are</p>
-            <h2 id="doors-title" className="h2">Two sides of one bill. <em>Both protected.</em></h2>
+            <h2 id="doors-title" className="h2">Two sides of one bill, both protected</h2>
           </div>
           <p>Miners keep custody of their coins. Hosts get paid in dollars on time. The contract sits in the middle and enforces the deal.</p>
         </div>
@@ -194,7 +194,7 @@ function How() {
     <section id="how" className="block" aria-labelledby="how-title">
       <div className="wrap">
         <p className="kicker">How it works</p>
-        <h2 id="how-title" className="h2" style={{ marginBottom: 40 }}>One rule. <em>Enforced by the contract.</em></h2>
+        <h2 id="how-title" className="h2" style={{ marginBottom: 40 }}>One rule, enforced by the contract</h2>
         <ol className="how">
           {steps.map(([t, d], i) => (
             <li key={t}><span className="n">0{i + 1}</span><h3>{t}</h3><p>{d}</p></li>
@@ -213,7 +213,7 @@ function Refusals() {
         <div className="block-head">
           <div>
             <p className="kicker">What it refuses</p>
-            <h2 id="rule-title" className="h2">Nothing leaves without <em>paying the bill. Not even you.</em></h2>
+            <h2 id="rule-title" className="h2">Nothing leaves without paying the bill, not even for you</h2>
           </div>
           <p>These are real refusals on NEAR {proofFile.network}. Each one failed on chain and never reached the signer, so no Bitcoin transaction could follow.</p>
         </div>
@@ -221,7 +221,7 @@ function Refusals() {
           {proofFile.refusals.map((r) => (
             <div key={r.tx} className="refusal">
               <span>{r.attempt}</span>
-              <span className="chip chip-lost">{r.expect}</span>
+              <span className="chip chip-lost code">{r.expect}</span>
               <a className="arrow-link" href={`${NEARBLOCKS_WEB}/txns/${r.tx}`} target="_blank" rel="noreferrer">nearblocks {r.tx.slice(0, 8)}&hellip;</a>
             </div>
           ))}
@@ -250,7 +250,7 @@ function ProofSummary() {
         <div className="block-head">
           <div>
             <p className="kicker">Check it yourself</p>
-            <h2 id="proof-title" className="h2">Don't trust us. <em>Read the chain.</em></h2>
+            <h2 id="proof-title" className="h2">Don't trust us, read the chain</h2>
           </div>
           <div style={{ maxWidth: 460 }}>
             <p className="muted" style={{ margin: "0 0 20px" }}>These checks run in your browser right now against the contract, Bitcoin and NEAR. They are the same checks as npm run verify in the repo.</p>
@@ -264,10 +264,9 @@ function ProofSummary() {
             // Counts only mean something once every check has finished.
             const pending = status === "running";
             const label = status === "error" && rows.length === 0 ? "Couldn't run" : pending ? "Checking" : failed ? `${failed} failed` : `${rows.length} of ${rows.length}`;
-            const chip = pending ? "chip-review" : failed || (status === "error" && rows.length === 0) ? "chip-lost" : "chip-lime";
             return (
               <div key={g} className="check">
-                <span className={`chip ${chip}`} style={{ justifySelf: "start" }}>{pending ? "…" : failed || (status === "error" && rows.length === 0) ? "Fail" : "Pass"}</span>
+                <span className={`led${pending ? " off" : failed || (status === "error" && rows.length === 0) ? " bad" : ""}`} aria-label={pending ? "Checking" : failed ? "Failed" : "Passed"} />
                 <span>{summary[g]}</span>
                 <span className="detail">{label}</span>
               </div>
@@ -292,7 +291,7 @@ function Faq() {
     <section className="block" aria-labelledby="faq-title">
       <div className="wrap">
         <p className="kicker">Questions</p>
-        <h2 id="faq-title" className="h2" style={{ marginBottom: 40 }}>Asked by miners <em>and hosts first.</em></h2>
+        <h2 id="faq-title" className="h2" style={{ marginBottom: 40 }}>Asked by miners and hosts first</h2>
         <div className="faq">
           {qa.map(([q, a], i) => (
             <details key={q} open={i === 0}><summary>{q}</summary><p>{a}</p></details>

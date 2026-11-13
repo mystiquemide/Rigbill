@@ -130,7 +130,7 @@ function IssueForm({ onDone }: { onDone: () => void }) {
     <form className="panel form issue" onSubmit={submit} noValidate aria-labelledby="issue-title">
       <div>
         <p className="kicker" id="issue-title">Issue a bill</p>
-        <p className="muted" style={{ margin: "14px 0 0", fontSize: 15 }}>Bill a miner in US dollars. You get USDC on Base when their next payout lands.</p>
+        <p className="muted" style={{ margin: "16px 0 0", fontSize: 15 }}>Bill a miner in US dollars. You get USDC on Base when their next payout lands.</p>
       </div>
       <Field id="miner" label="Miner's NEAR account" value={miner} set={setMiner} help={bad("miner") ? errs.miner! : "The account the miner signs in to Rigbill with."} bad={bad("miner")} />
       <Field id="amount" label="Amount (USD)" value={amount} set={setAmount} help={amountHelp} bad={bad("amount")} warn={belowMin} mode="decimal" />
@@ -168,7 +168,7 @@ function HostBillDetail({ account, id }: { account: string; id: string }) {
   if (error) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={error} retry={load} /></>;
   if (bill === undefined) return <>{back}<p className="skeleton">Reading bill #{id} from the contract&hellip;</p></>;
   if (bill === null || bill.host !== account) {
-    return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: "14px 0 0" }}>There is no bill #{id} issued by {account}.</p></section></>;
+    return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: "16px 0 0" }}>There is no bill #{id} issued by {account}.</p></section></>;
   }
   const afterTx = () => void refetchBillUntilChanged(id, bill.status).then((b) => setBill(b)).catch((e) => setError(msg(e)));
   return <HostBill bill={bill} back={back} onChanged={afterTx} />;
