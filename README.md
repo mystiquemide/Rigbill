@@ -4,13 +4,17 @@
 
 A Bitcoin payout address that can't skip the hosting bill. While a bill is open, nothing leaves it unless it pays the bill first, in USDC, and the rest goes to the miner's own wallet.
 
-Miners earn BTC but pay hosting in dollars, and a miner can move a payout before the bill clears. Rigbill gives each miner a payout address whose only key is a NEAR smart contract, through Chain Signatures. The contract reads every Bitcoin transaction before it signs and refuses any that doesn't pay the open bill through NEAR Intents 1Click.
+Mining hosts run other people's rigs and bill them every month in dollars. The miners earn BTC, so every month someone sells coins by hand, a pool converts them custodially, or the host chases a late payment. Any miner can also move a payout before the bill clears. Rigbill gives each miner a payout address whose only key is a NEAR smart contract, through Chain Signatures. The contract reads every Bitcoin transaction before it signs and refuses any that doesn't pay the open bill through NEAR Intents 1Click.
 
 Here it is refusing: the miner tried to [send everything to cold while a bill was open](https://testnet.nearblocks.io/txns/B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J) and the contract failed with `BILL_OPEN_HOST_OUTPUT_REQUIRED` before asking the MPC network for a signature. The next payout [paid the bill and sent the rest to cold](https://mempool.space/testnet4/tx/8549fc8d90d10f02aee8cf3b528259f26962f793837c6bb40ab74ca804b3f27e).
 
 ![Rigbill landing page with a live paid bill read from the contract](docs/screens/landing.webp)
 
 ![Architecture](docs/diagram.svg)
+
+## Who it's for
+
+A hosting company with a few hundred client rigs could start using it tomorrow. It needs no new bank account, exchange account or custodian. The host issues bills in USD and gets USDC on Base, which drops straight into normal accounting. The miner keeps self-custody: the remainder of every payout lands in their own cold wallet, and nobody, Rigbill included, can sign anything else.
 
 ## How it works
 
@@ -21,6 +25,14 @@ Here it is refusing: the miner tried to [send everything to cold while a bill wa
 5. 1Click swaps the BTC and delivers USDC to the host. The host marks the bill paid, and later payouts go straight to cold storage.
 
 The rule: nothing leaves the payout address except to the host's approved bill or the miner's cold wallet, and while a bill is open nothing leaves without paying it.
+
+## Why NEAR
+
+Take NEAR out and there's no product left.
+
+- Chain Signatures (`v1.signer`) is the only key the payout address has. The address is derived from the contract's account, so no person or server could ever sign for it.
+- The NEAR contract is the policy. It builds the BIP143 sighash for every Bitcoin transaction itself, checks each output against the open bill and the miner's settings, and only then requests the MPC signature.
+- NEAR Intents 1Click turns the bill's share of the payout into USDC on Base at a quote the host locks and the miner's ceiling caps.
 
 ## Proof
 
@@ -65,6 +77,10 @@ Every screen reads live state from the contract, Bitcoin and NEAR. Nothing is sa
 | `/proof` | Anyone | The `npm run verify` checks, run in the browser |
 
 Sign in with any NEAR wallet that supports testnet through NEAR Connect, such as Meteor, Intear or Nightly.
+
+## Status
+
+Everything here was written from 2026-11-12. The full loop runs on NEAR testnet and Bitcoin testnet4: MPC signing, the bill lifecycle and every refusal, checked by `npm run verify` and CI on each commit. NEAR Intents has no testnet, so the swap itself is the one part that hasn't run end to end. The code for it follows 1Click's API, and each verify run fetches a live mainnet quote for a $6 bill to show the route is there.
 
 ## Run it
 
@@ -118,16 +134,7 @@ cd contract && cargo test
 | `proof/` | Refusal transactions that `npm run verify` checks |
 | `e2e/` | Browser end-to-end test of the web app on testnet |
 
-## Hackathon
-
-Built at NEAR HACKATHON in the Real-World Money track (`realworld`): an invoicing and payment rail a mining host could use with its clients, settled in stablecoins.
-
-- Everything in this repository was written during the event, starting 2026-11-12.
-- NEAR features used: a contract on NEAR, Chain Signatures (`v1.signer`) as the only key to the Bitcoin payout address, and NEAR Intents 1Click for BTC to USDC on Base.
-- What is proven: the whole loop on NEAR testnet and Bitcoin testnet4, including MPC signing, the bill lifecycle and the on-chain refusals. `npm run verify` and CI check it on every commit.
-- What needs mainnet: the 1Click swap and the USDC delivery, because NEAR Intents has no testnet. That code path is built, `npm run verify` and `/proof` fetch a live mainnet 1Click quote for a $6 bill on every run, but no real swap has settled yet.
-
-## Limits
+## Known limits
 
 - The bill is marked paid when the host confirms it. That's safe in one direction: confirming is the host giving up its own claim, so it can't take anything from the miner. A host that never confirms only blocks the miner until the bill expires. Verifying the Base USDC transfer through `v1.signer`'s foreign-chain verification would remove that wait and isn't built yet.
 - The contract only tracks payouts it signed. It can't stop a transaction signed elsewhere, but the payout address has no other key, so there is nothing else to sign with.
