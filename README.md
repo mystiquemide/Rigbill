@@ -2,9 +2,11 @@
 
 [![CI](https://github.com/mystiquemide/Rigbill/actions/workflows/ci.yml/badge.svg)](https://github.com/mystiquemide/Rigbill/actions/workflows/ci.yml)
 
-A Bitcoin payout address that pays the miner's hosting bill in USDC first and sends the rest to cold storage, with no company holding the keys.
+A Bitcoin payout address that can't skip the hosting bill. While a bill is open, nothing leaves it unless it pays the bill first, in USDC, and the rest goes to the miner's own wallet.
 
-Miners earn BTC but pay hosting in dollars. Today the only automatic conversion is custodial: a pool converts your balance for you, or you sell by hand every month. Rigbill gives each miner a payout address that a NEAR smart contract controls through Chain Signatures. While the host's bill is open, the contract will only sign a Bitcoin transaction that pays that bill through NEAR Intents, with the remainder going to the miner's own wallet.
+Miners earn BTC but pay hosting in dollars, and a miner can move a payout before the bill clears. Rigbill gives each miner a payout address whose only key is a NEAR smart contract, through Chain Signatures. The contract reads every Bitcoin transaction before it signs and refuses any that doesn't pay the open bill through NEAR Intents 1Click.
+
+Here it is refusing: the miner tried to [send everything to cold while a bill was open](https://testnet.nearblocks.io/txns/B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J) and the contract failed with `BILL_OPEN_HOST_OUTPUT_REQUIRED` before asking the MPC network for a signature. The next payout [paid the bill and sent the rest to cold](https://mempool.space/testnet4/tx/8549fc8d90d10f02aee8cf3b528259f26962f793837c6bb40ab74ca804b3f27e).
 
 ![Rigbill landing page with a live paid bill read from the contract](docs/screens/landing.webp)
 
@@ -28,7 +30,7 @@ The full loop runs on NEAR testnet and Bitcoin testnet4. Check it yourself with 
 npm run verify
 ```
 
-It reads the contract and both chains live, then checks that the payout address comes from the MPC key, that each Bitcoin transaction matches what the contract signed output for output, and that each refusal failed on chain without ever reaching the signer.
+It reads the contract and both chains live, then checks that the payout address comes from the MPC key, that each Bitcoin transaction matches what the contract signed output for output, that each refusal failed on chain without ever reaching the signer, and that 1Click returns a live mainnet quote for the USDC leg (a dry quote, nothing is sent).
 
 | What | Link |
 |---|---|
@@ -123,11 +125,12 @@ Built at NEAR HACKATHON in the Real-World Money track (`realworld`): an invoicin
 - Everything in this repository was written during the event, starting 2026-11-12.
 - NEAR features used: a contract on NEAR, Chain Signatures (`v1.signer`) as the only key to the Bitcoin payout address, and NEAR Intents 1Click for BTC to USDC on Base.
 - What is proven: the whole loop on NEAR testnet and Bitcoin testnet4, including MPC signing, the bill lifecycle and the on-chain refusals. `npm run verify` and CI check it on every commit.
-- What needs mainnet: the 1Click swap and the USDC delivery, because NEAR Intents has no testnet. That code path is built and follows 1Click's published API, but has not settled a real swap yet.
+- What needs mainnet: the 1Click swap and the USDC delivery, because NEAR Intents has no testnet. That code path is built, `npm run verify` and `/proof` fetch a live mainnet 1Click quote for a $6 bill on every run, but no real swap has settled yet.
 
 ## Limits
 
-- The bill is marked paid when the host confirms it. Verifying the Base USDC transfer through `v1.signer`'s foreign-chain verification would make this trustless and isn't built yet.
+- The bill is marked paid when the host confirms it. That's safe in one direction: confirming is the host giving up its own claim, so it can't take anything from the miner. A host that never confirms only blocks the miner until the bill expires. Verifying the Base USDC transfer through `v1.signer`'s foreign-chain verification would remove that wait and isn't built yet.
+- The contract only tracks payouts it signed. It can't stop a transaction signed elsewhere, but the payout address has no other key, so there is nothing else to sign with.
 - A miner can still point their pool at a different address off-chain. Hosts usually control the rigs and can watch each rig's payout address.
 - An unpaid bill expires 7 days after its due date, which releases the miner.
 - The contract account keeps a full-access key, so its code can be upgraded. No method moves funds outside the split rules.

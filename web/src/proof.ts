@@ -2,6 +2,7 @@ import proofTestnet from "../../proof/testnet.json";
 import { payoutFromDerivedKey } from "./btc";
 import { CONTRACT_ID, ESPLORA, MEMPOOL_WEB, NEARBLOCKS_WEB, NEAR_RPC, SIGNER_ID, network } from "./config";
 import { getMiner, view, type Bill, type Split } from "./near";
+import { mainnetQuoteCheck } from "./oneclick";
 
 /**
  * The browser twin of `npm run verify`. Every check reads NEAR RPC and a public
@@ -18,7 +19,7 @@ const PROOFS: Record<string, ProofFile | undefined> = { testnet: proofTestnet };
 export const proofFile: ProofFile | null = PROOFS[network]?.contract === CONTRACT_ID ? PROOFS[network]! : null;
 
 export interface Check {
-  group: "Contract" | "Payout address" | "Bills" | "Refusals";
+  group: "Contract" | "Payout address" | "Bills" | "Refusals" | "1Click";
   label: string;
   detail: string;
   ok: boolean;
@@ -105,6 +106,12 @@ export async function runChecks(onProgress?: (done: Check[]) => void): Promise<C
     const failure = JSON.stringify(outcomes.map((o: any) => o.outcome.status?.Failure).find(Boolean) ?? "");
     const reachedSigner = res.receipts_outcome.some((o: any) => o.outcome.executor_id === SIGNER_ID);
     push({ group: "Refusals", label: r.attempt, detail: r.expect, ok: failure.includes(r.expect) && !reachedSigner, href: `${NEARBLOCKS_WEB}/txns/${r.tx}` });
+  }
+  const q = await mainnetQuoteCheck(payout.pubkey).catch((e) => ({ error: e instanceof Error ? e.message : String(e) }));
+  if ("error" in q) push({ group: "1Click", label: "Live 1Click quote for a $6 bill", detail: q.error, ok: false });
+  else {
+    push({ group: "1Click", label: "1Click quotes BTC to exactly 6.00 USDC on Base", detail: `${Number(q.amountIn).toLocaleString("en-US")} sats in, ${q.amountOutFormatted} USDC out`, ok: q.amountOut === "6000000" });
+    push({ group: "1Click", label: "Refunds go to this payout key on Bitcoin mainnet", detail: q.refundTo, ok: true });
   }
   return out;
 }

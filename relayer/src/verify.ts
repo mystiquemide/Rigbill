@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import { base58, hex } from "@scure/base";
 import * as B from "./btc.js";
+import { NETWORK as NETWORK_MAINNET } from "@scure/btc-signer";
 import { ESPLORA_URLS, MEMPOOL_WEB, NEARBLOCKS_WEB, NEAR_RPC_URL, network } from "./config.js";
 import * as N from "./near.js";
 
@@ -130,6 +131,28 @@ async function main() {
     const text = JSON.stringify(failure ?? "");
     const reachedSigner = res.receipts_outcome.some((o: any) => o.outcome.executor_id === N.SIGNER_ID);
     check(text.includes(r.expect) && !reachedSigner, `${r.attempt}: refused with ${r.expect}, no signature requested`, `${NEARBLOCKS_WEB}/txns/${r.tx}`);
+  }
+
+  console.log("\n5. USDC leg on mainnet (dry 1Click quote, nothing is sent)");
+  try {
+    const refundTo = B.payoutAddress(key, NETWORK_MAINNET);
+    const res = await fetch("https://1click.chaindefuser.com/v0/quote", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        dry: true, swapType: "EXACT_OUTPUT", slippageTolerance: 100,
+        originAsset: "nep141:btc.omft.near", depositType: "ORIGIN_CHAIN",
+        destinationAsset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+        amount: "6000000", refundTo, refundType: "ORIGIN_CHAIN",
+        recipient: "0x1111111111111111111111111111111111111111", recipientType: "DESTINATION_CHAIN",
+        deadline: new Date(Date.now() + 864e5).toISOString(),
+      }),
+    });
+    const body: any = await res.json();
+    check(res.ok && body.quote?.amountOut === "6000000", "1Click quotes BTC to exactly 6.00 USDC on Base", res.ok ? `${body.quote.amountIn} sats in` : body?.message ?? String(res.status));
+    ok("refunds go to this payout key on Bitcoin mainnet", refundTo);
+  } catch (e) {
+    bad("1Click reachable", e instanceof Error ? e.message : String(e));
   }
 
   console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);

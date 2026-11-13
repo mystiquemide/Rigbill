@@ -8,6 +8,7 @@ const GROUPS: { key: Check["group"]; title: string }[] = [
   { key: "Payout address", title: "2. Payout address" },
   { key: "Bills", title: "3. Bills and the Bitcoin transactions that paid them" },
   { key: "Refusals", title: "4. Refusals" },
+  { key: "1Click", title: "5. USDC leg on mainnet (dry quote, nothing is sent)" },
 ];
 
 /** S8: every check from `npm run verify`, run live in the browser. */

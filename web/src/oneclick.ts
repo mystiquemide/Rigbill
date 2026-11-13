@@ -2,6 +2,9 @@
 const API = "https://1click.chaindefuser.com/v0";
 export const BTC_ASSET = "nep141:btc.omft.near";
 export const BASE_USDC_ASSET = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near";
+import * as btc from "@scure/btc-signer";
+import { hex } from "@scure/base";
+
 /** 1Click's BTC minimum on 2026-11-12. Re-checked live through dry quotes. */
 export const ONECLICK_MIN_SATS = 8300;
 
@@ -74,4 +77,14 @@ export async function swapStatus(depositAddress: string): Promise<SwapStatusResp
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body?.message ?? `1Click status ${res.status}`);
   return body;
+}
+
+/**
+ * A dry mainnet quote for a $6 bill, refunding to the same MPC key's mainnet
+ * address. Dry quotes move nothing, so the recipient is a fixed test address.
+ */
+export async function mainnetQuoteCheck(payoutPubkeyHex: string): Promise<{ amountIn: string; amountOut: string; amountOutFormatted: string; refundTo: string }> {
+  const refundTo = btc.p2wpkh(hex.decode(payoutPubkeyHex), btc.NETWORK).address!;
+  const q = await quoteBillInBtc({ dry: true, usdCents: 600, recipient: "0x1111111111111111111111111111111111111111", refundTo, deadline: new Date(Date.now() + 864e5) });
+  return { amountIn: q.amountIn, amountOut: q.amountOut, amountOutFormatted: (q as Quote & { amountOutFormatted?: string }).amountOutFormatted ?? String(Number(q.amountOut) / 1e6), refundTo };
 }
