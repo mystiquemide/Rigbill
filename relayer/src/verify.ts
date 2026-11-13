@@ -120,6 +120,11 @@ async function main() {
       );
       check(sp.outputs[1]?.address === m.cold_address && sp.outputs.length === 2, "the rest went to the miner's cold address");
     }
+    if (network === "mainnet" && b.quote && b.status === "Paid") {
+      const st: any = await fetch(`https://1click.chaindefuser.com/v0/status?depositAddress=${b.quote.deposit_address}`).then((r) => r.json()).catch(() => ({}));
+      const out = st.swapDetails?.destinationChainTxHashes?.[0]?.hash ?? "";
+      check(st.status === "SUCCESS", "1Click swapped it and delivered USDC on Base", `${st.swapDetails?.amountOutFormatted ?? "?"} USDC  ${out ? `https://basescan.org/tx/${out}` : st.status}`);
+    }
     check(tx.status.confirmed, "confirmed on Bitcoin", tx.status.confirmed ? `block ${tx.status.block_height}` : "in mempool");
   }
 
@@ -133,7 +138,7 @@ async function main() {
     check(text.includes(r.expect) && !reachedSigner, `${r.attempt}: refused with ${r.expect}, no signature requested`, `${NEARBLOCKS_WEB}/txns/${r.tx}`);
   }
 
-  console.log("\n5. USDC leg on mainnet (dry 1Click quote, nothing is sent)");
+  console.log("\n5. 1Click route on mainnet (dry quote, nothing is sent)");
   try {
     const refundTo = B.payoutAddress(key, NETWORK_MAINNET);
     const res = await fetch("https://1click.chaindefuser.com/v0/quote", {
@@ -143,13 +148,13 @@ async function main() {
         dry: true, swapType: "EXACT_OUTPUT", slippageTolerance: 100,
         originAsset: "nep141:btc.omft.near", depositType: "ORIGIN_CHAIN",
         destinationAsset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
-        amount: "6000000", refundTo, refundType: "ORIGIN_CHAIN",
+        amount: "10000000", refundTo, refundType: "ORIGIN_CHAIN",
         recipient: "0x1111111111111111111111111111111111111111", recipientType: "DESTINATION_CHAIN",
         deadline: new Date(Date.now() + 864e5).toISOString(),
       }),
     });
     const body: any = await res.json();
-    check(res.ok && body.quote?.amountOut === "6000000", "1Click quotes BTC to exactly 6.00 USDC on Base", res.ok ? `${body.quote.amountIn} sats in` : body?.message ?? String(res.status));
+    check(res.ok && body.quote?.amountOut === "10000000", "1Click quotes BTC to exactly 10.00 USDC on Base", res.ok ? `${body.quote.amountIn} sats in` : body?.message ?? String(res.status));
     ok("refunds go to this payout key on Bitcoin mainnet", refundTo);
   } catch (e) {
     bad("1Click reachable", e instanceof Error ? e.message : String(e));

@@ -6,7 +6,7 @@ A Bitcoin payout address that can't skip the hosting bill. While a bill is open,
 
 Mining hosts run other people's rigs and bill them every month in dollars. The miners earn BTC, so every month someone sells coins by hand, a pool converts them custodially, or the host chases a late payment. Any miner can also move a payout before the bill clears. Rigbill gives each miner a payout address whose only key is a NEAR smart contract, through Chain Signatures. The contract reads every Bitcoin transaction before it signs and refuses any that doesn't pay the open bill through NEAR Intents 1Click.
 
-Here it is refusing: the miner tried to [send everything to cold while a bill was open](https://testnet.nearblocks.io/txns/B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J) and the contract failed with `BILL_OPEN_HOST_OUTPUT_REQUIRED` before asking the MPC network for a signature. The next payout [paid the bill and sent the rest to cold](https://mempool.space/testnet4/tx/8549fc8d90d10f02aee8cf3b528259f26962f793837c6bb40ab74ca804b3f27e).
+It runs on mainnet with real money. The miner tried to [send everything to cold while a bill was open](https://nearblocks.io/txns/2cTep6qoRqYoLKb6uoSaPFfi1jsRzUvUfuvyrsomn9Ch) and the contract failed with `BILL_OPEN_HOST_OUTPUT_REQUIRED` before asking the MPC network for a signature. The payout then [paid the bill and sent the rest to cold](https://mempool.space/tx/fcdf483e77ceb067b3c120f42c0b2a91a20194d61ed63329ca3c28837b25a397), and 1Click [delivered the USDC on Base](https://basescan.org/tx/0x2c3e7251d5178d0b83006457e06694e1ecf80176e072dcbb80cd931f1950b1c6).
 
 ![Rigbill landing page with a live paid bill read from the contract](docs/screens/landing.webp)
 
@@ -36,34 +36,37 @@ Take NEAR out and there's no product left.
 
 ## Proof
 
-The full loop runs on NEAR testnet and Bitcoin testnet4. Check it yourself with no keys and no setup beyond Node 20+:
+The full loop runs on NEAR mainnet, Bitcoin mainnet and Base. Check it yourself with no keys and no setup beyond Node 20+:
 
 ```bash
 npm run verify
 ```
 
-It reads the contract and both chains live, then checks that the payout address comes from the MPC key, that each Bitcoin transaction matches what the contract signed output for output, that each refusal failed on chain without ever reaching the signer, and that 1Click returns a live mainnet quote for the USDC leg (a dry quote, nothing is sent).
+It reads the contract and all three chains live, then checks that the payout address comes from the MPC key, that each Bitcoin transaction matches what the contract signed output for output, that 1Click delivered the USDC, and that each refusal failed on chain without ever reaching the signer.
 
 | What | Link |
 |---|---|
-| Contract | [v1.rigbill.testnet](https://testnet.nearblocks.io/address/v1.rigbill.testnet) |
-| Payout address | [tb1qmhw640shh0426krfrp6vt60s6ukahpjtaaxfeu](https://mempool.space/testnet4/address/tb1qmhw640shh0426krfrp6vt60s6ukahpjtaaxfeu) |
-| NEAR tx that requested the MPC signature | [3vhWBY74…](https://testnet.nearblocks.io/txns/3vhWBY74mJ8hUjuXQEmRN6sQh8jQ1WmvVvs5dzrjzrpP) |
-| Bitcoin split that paid bill #0 | [8549fc8d…](https://mempool.space/testnet4/tx/8549fc8d90d10f02aee8cf3b528259f26962f793837c6bb40ab74ca804b3f27e): 14,092 sats to the deposit address, 35,578 to cold |
-| Host confirms paid | [GTd6xhQ6…](https://testnet.nearblocks.io/txns/GTd6xhQ6kBXMTp8xcmtM3L7W5PvbwcqNkMfEnst7Ew5W) |
-| Refused: cold-only sweep while a bill is open | [B78JMiGR…](https://testnet.nearblocks.io/txns/B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J) `BILL_OPEN_HOST_OUTPUT_REQUIRED` |
-| Refused: a third output | [3m3KTFmS…](https://testnet.nearblocks.io/txns/3m3KTFmSdhyLvfdDWsk68nUaAUPxwbpt6G6HLLKoXUy5) `OUTPUT_NOT_ALLOWED` |
-| Refused: spending a payout that was already signed | [6qv2g2Uk…](https://testnet.nearblocks.io/txns/6qv2g2Uk1P6AmE3SdptprKu8kJ8T5UMDxGyGA9GiGUmQ) `OUTPOINT_ALREADY_SIGNED` |
+| Contract | [v1.rigbill.near](https://nearblocks.io/address/v1.rigbill.near) |
+| Payout address | [bc1qha9neh96udkmnrudq70xc4rfzvnr6p60truyns](https://mempool.space/address/bc1qha9neh96udkmnrudq70xc4rfzvnr6p60truyns) |
+| NEAR tx that requested the MPC signature | [5iouTCA3…](https://nearblocks.io/txns/5iouTCA3KtZL5Wkoe45wyd3bPEuZPKPLBFa7JynoreBU) |
+| Bitcoin split that paid bill #0 | [fcdf483e…](https://mempool.space/tx/fcdf483e77ceb067b3c120f42c0b2a91a20194d61ed63329ca3c28837b25a397): 9,113 sats to the 1Click deposit, 1,657 to cold |
+| USDC delivered on Base | [0x2c3e7251…](https://basescan.org/tx/0x2c3e7251d5178d0b83006457e06694e1ecf80176e072dcbb80cd931f1950b1c6): 6.20 USDC |
+| Host confirms paid | [FnW37Rd4…](https://nearblocks.io/txns/FnW37Rd4xu7rY4GG4ovtNmHt484Frep5hZ7dgZ6B6NqG) |
+| Refused: cold-only sweep while a bill is open | [2cTep6qo…](https://nearblocks.io/txns/2cTep6qoRqYoLKb6uoSaPFfi1jsRzUvUfuvyrsomn9Ch) `BILL_OPEN_HOST_OUTPUT_REQUIRED` |
+| Refused: a third output | [2GJwdkLg…](https://nearblocks.io/txns/2GJwdkLgVbccvwaWEUvArBy4H8jYu2wyxMyqmVoymRFt) `OUTPUT_NOT_ALLOWED` |
+| Refused: spending a payout that was already signed | [8gLWfPQx…](https://nearblocks.io/txns/8gLWfPQxHjQxTe4An9AN48mWgRMFv8Ubh8MsQwKY6QGK) `OUTPOINT_ALREADY_SIGNED` |
+
+The bill was $6. 1Click's minimum had risen just above that, so the host locked a quote for 6.20 USDC, still inside the miner's sats ceiling.
 
 Nearblocks can block automated clients. Any NEAR transaction above can also be read straight from the public RPC:
 
 ```bash
-curl -s https://rpc.testnet.near.org -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tx","params":{"tx_hash":"B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J","sender_account_id":"rigbill.testnet","wait_until":"FINAL"}}'
+curl -s https://rpc.mainnet.near.org -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tx","params":{"tx_hash":"2cTep6qoRqYoLKb6uoSaPFfi1jsRzUvUfuvyrsomn9Ch","sender_account_id":"1991985a028ec13f6c7794d764ea1494f7acc049059ef8302f50e320059dbc7c","wait_until":"FINAL"}}'
 ```
 
-The same loop also ran through the web app with fresh accounts (`e2e/`): the miner's sweep to cold was [refused in the UI](https://testnet.nearblocks.io/txns/9MUxwPwg3o3ScCiv79R7ebHhJ5nvz8urHAcMrgARy72Z), then the payout [paid the $6 bill](https://mempool.space/testnet4/tx/b0a874bc798c64d7f513605aaab5e58e021eb4b935f7dce90f161fe17b4ccdd9) and the host confirmed it.
+The same build ran the loop first on NEAR testnet and Bitcoin testnet4 (`NETWORK=testnet npm run verify`), with a stand-in for the 1Click deposit since Intents has no testnet: [split](https://mempool.space/testnet4/tx/8549fc8d90d10f02aee8cf3b528259f26962f793837c6bb40ab74ca804b3f27e) and refusals [1](https://testnet.nearblocks.io/txns/B78JMiGRV33ntgvKzKoP5RpV45Ufn3u8JbKF4KndcN8J), [2](https://testnet.nearblocks.io/txns/3m3KTFmSdhyLvfdDWsk68nUaAUPxwbpt6G6HLLKoXUy5), [3](https://testnet.nearblocks.io/txns/6qv2g2Uk1P6AmE3SdptprKu8kJ8T5UMDxGyGA9GiGUmQ). On testnet the loop also ran through the web app with fresh accounts (`e2e/`): the miner's sweep to cold was [refused in the UI](https://testnet.nearblocks.io/txns/9MUxwPwg3o3ScCiv79R7ebHhJ5nvz8urHAcMrgARy72Z), then the payout [paid the $6 bill](https://mempool.space/testnet4/tx/b0a874bc798c64d7f513605aaab5e58e021eb4b935f7dce90f161fe17b4ccdd9) and the host confirmed it.
 
-NEAR Intents has no testnet, so on testnet the host's output goes to a stand-in deposit address and there is no USDC leg. The demo payout comes from the miner's own testnet wallet, standing in for a pool.
+The demo payouts come from the builder's own wallet, standing in for a pool.
 
 ## Screens
 
@@ -82,15 +85,15 @@ Every screen reads live state from the contract, Bitcoin and NEAR. Nothing is sa
 | `/host/bills/:id` | Host | Lock a live 1Click quote, confirm paid or report a refund |
 | `/proof` | Anyone | The `npm run verify` checks, run in the browser |
 
-Sign in with any NEAR wallet that supports testnet through NEAR Connect, such as Meteor, Intear or Nightly.
+Sign in with any NEAR wallet through NEAR Connect, such as Meteor, Intear or Nightly.
 
 ## Status
 
-Everything here was written from 2026-11-12. The full loop runs on NEAR testnet and Bitcoin testnet4: MPC signing, the bill lifecycle and every refusal, checked by `npm run verify` and CI on each commit. NEAR Intents has no testnet, so the swap itself is the one part that hasn't run end to end. The code for it follows 1Click's API, and each verify run fetches a live mainnet quote for a $6 bill to show the route is there.
+Everything here was written from 2026-11-12. The whole loop has run on mainnet: MPC signing, the bill lifecycle, a real BTC to USDC swap through 1Click and every refusal. `npm run verify` and CI check both mainnet and testnet on each commit, along with a live 1Click quote to show the route is still open.
 
 ## Run it
 
-Web app (testnet by default, `VITE_NETWORK=mainnet` for mainnet):
+Web app (mainnet by default, `VITE_NETWORK=testnet` for testnet):
 
 ```bash
 cd web && npm install && npm run dev
@@ -155,7 +158,7 @@ Runs 64 contract tests (split rules, every refusal, BIP143 sighash vectors, bill
 - A miner can still point their pool at a different address off-chain. Hosts usually control the rigs and can watch each rig's payout address.
 - An unpaid bill expires 7 days after its due date, which releases the miner.
 - The contract account keeps a full-access key, so its code can be upgraded. No method moves funds outside the split rules.
-- 1Click won't swap less than about 8,300 sats, so very small bills can't be paid this way.
+- 1Click has a minimum swap, a little over $6 of USDC when this ran, so very small bills can't be paid this way.
 
 ## License
 

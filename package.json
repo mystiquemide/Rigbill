@@ -4,6 +4,6 @@
   "license": "MIT",
   "scripts": {
     "test": "cd contract && cargo test && cd ../relayer && npm ci --silent --no-audit --no-fund && npm test",
-    "verify": "npm --prefix relayer ci --silent --no-audit --no-fund && NETWORK=${NETWORK:-testnet} npm --prefix relayer run --silent verify"
+    "verify": "npm --prefix relayer ci --silent --no-audit --no-fund && NETWORK=${NETWORK:-mainnet} npm --prefix relayer run --silent verify"
   }
 }

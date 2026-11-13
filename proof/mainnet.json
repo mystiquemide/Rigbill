@@ -1,0 +1,25 @@
+{
+  "network": "mainnet",
+  "contract": "v1.rigbill.near",
+  "miner": "rigbill.near",
+  "refusals": [
+    {
+      "tx": "2cTep6qoRqYoLKb6uoSaPFfi1jsRzUvUfuvyrsomn9Ch",
+      "sender": "1991985a028ec13f6c7794d764ea1494f7acc049059ef8302f50e320059dbc7c",
+      "attempt": "Send everything to cold while bill 0 is open",
+      "expect": "BILL_OPEN_HOST_OUTPUT_REQUIRED"
+    },
+    {
+      "tx": "2GJwdkLgVbccvwaWEUvArBy4H8jYu2wyxMyqmVoymRFt",
+      "sender": "1991985a028ec13f6c7794d764ea1494f7acc049059ef8302f50e320059dbc7c",
+      "attempt": "Add a third output to an unrelated address",
+      "expect": "OUTPUT_NOT_ALLOWED"
+    },
+    {
+      "tx": "8gLWfPQxHjQxTe4An9AN48mWgRMFv8Ubh8MsQwKY6QGK",
+      "sender": "1991985a028ec13f6c7794d764ea1494f7acc049059ef8302f50e320059dbc7c",
+      "attempt": "Spend a payout that split 0 already signed",
+      "expect": "OUTPOINT_ALREADY_SIGNED"
+    }
+  ]
+}

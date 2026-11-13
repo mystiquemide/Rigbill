@@ -65,5 +65,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Read the contract, NEAR and Bitcoin testnet and check every recorded proof
+      - name: Check every recorded proof on NEAR and Bitcoin mainnet
         run: npm run verify
+      - name: Check every recorded proof on NEAR testnet and Bitcoin testnet4
+        run: NETWORK=testnet npm run verify

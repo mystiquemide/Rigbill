@@ -80,11 +80,11 @@ export async function swapStatus(depositAddress: string): Promise<SwapStatusResp
 }
 
 /**
- * A dry mainnet quote for a $6 bill, refunding to the same MPC key's mainnet
+ * A dry mainnet quote for a $10 bill, refunding to the same MPC key's mainnet
  * address. Dry quotes move nothing, so the recipient is a fixed test address.
  */
 export async function mainnetQuoteCheck(payoutPubkeyHex: string): Promise<{ amountIn: string; amountOut: string; amountOutFormatted: string; refundTo: string }> {
   const refundTo = btc.p2wpkh(hex.decode(payoutPubkeyHex), btc.NETWORK).address!;
-  const q = await quoteBillInBtc({ dry: true, usdCents: 600, recipient: "0x1111111111111111111111111111111111111111", refundTo, deadline: new Date(Date.now() + 864e5) });
+  const q = await quoteBillInBtc({ dry: true, usdCents: 1000, recipient: "0x1111111111111111111111111111111111111111", refundTo, deadline: new Date(Date.now() + 864e5) });
   return { amountIn: q.amountIn, amountOut: q.amountOut, amountOutFormatted: (q as Quote & { amountOutFormatted?: string }).amountOutFormatted ?? String(Number(q.amountOut) / 1e6), refundTo };
 }

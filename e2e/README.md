@@ -6,7 +6,7 @@ Drives the real web app in Chromium against the live testnet contract. The only 
 `flow2.cjs`: after the payout address holds a confirmed payout, the miner's sweep to cold is refused on chain, the relayer pays the bill, the host confirms paid.
 
 ```bash
-cd web && npm run build && npx vite preview --port 4173
+cd web && VITE_NETWORK=testnet npm run build && npx vite preview --port 4173
 ```
 
 ```bash

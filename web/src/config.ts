@@ -1,7 +1,7 @@
 import { NETWORK, TEST_NETWORK } from "@scure/btc-signer";
 
 const env = import.meta.env;
-export const network: "mainnet" | "testnet" = env.VITE_NETWORK === "mainnet" ? "mainnet" : "testnet";
+export const network: "mainnet" | "testnet" = env.VITE_NETWORK === "testnet" ? "testnet" : "mainnet";
 const testnet = network === "testnet";
 
 export const btcNetwork = testnet ? TEST_NETWORK : NETWORK;
