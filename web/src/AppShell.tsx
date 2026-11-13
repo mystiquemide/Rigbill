@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { CONTRACT_ID, NEARBLOCKS_WEB, network } from "./config";
-import { Logo } from "./Landing";
+import { Logo } from "./Brand";
 import { Link } from "./Link";
 import { TxBanner } from "./TxBanner";
 import { signIn, signOut, watchAccount } from "./wallet";

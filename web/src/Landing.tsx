@@ -2,45 +2,17 @@ import { useEffect, useState } from "react";
 import { MEMPOOL_WEB, NEARBLOCKS_WEB, CONTRACT_ID } from "./config";
 import { latestPaidBill, proofFile, runChecks, type Check, type PaidBill } from "./proof";
 import { Link } from "./Link";
+import { SiteNav } from "./SiteNav";
+import { Logo } from "./Brand";
 
 const sats = (v: string | number) => `${Number(v).toLocaleString("en-US")} sats`;
 const usd = (cents: string) => `$${(Number(cents) / 100).toFixed(2)}`;
 const GITHUB = "https://github.com/mystiquemide/Rigbill";
 
-/** The split mark: one payout in, the host's share first (lime), the rest to the miner. */
-export function Mark({ size = 34 }: { size?: number }) {
-  return (
-    <svg className="logo-mark" width={size} height={size} viewBox="0 0 96 96" aria-hidden="true">
-      <rect width="96" height="96" rx="22" fill="var(--lime)" />
-      <path d="M48 16V42C48 54 34 58 30 80M48 42C48 54 62 58 66 80" stroke="var(--ground)" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  );
-}
-
-export function Logo() {
-  return (
-    <Link to="/" className="logo" aria-label="Rigbill home">
-      <Mark />
-      rigbill
-    </Link>
-  );
-}
-
 export default function Landing() {
   return (
     <>
-      <header className="site-nav">
-        <div className="wrap">
-          <Logo />
-          <nav aria-label="Main">
-            <a href="#how">How it works</a>
-            <a href="#doors">For miners</a>
-            <a href="#doors">For hosts</a>
-            <Link to="/proof">Proof</Link>
-            <Link to="/miner" className="btn">Open app</Link>
-          </nav>
-        </div>
-      </header>
+      <SiteNav />
       <main>
         <Hero />
         <Doors />
@@ -68,7 +40,7 @@ export default function Landing() {
             <p className="small">Built on NEAR Chain Signatures and NEAR Intents.</p>
           </div>
           <nav aria-label="Footer">
-            <a href="#how">How it works</a>
+            <Link to="/#how">How it works</Link>
             <Link to="/proof">Proof</Link>
             <a href={GITHUB} target="_blank" rel="noreferrer">GitHub</a>
             <Link to="/miner">Open app</Link>

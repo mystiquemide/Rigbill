@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CONTRACT_ID, network } from "./config";
-import { Logo } from "./Landing";
 import { runChecks, type Check } from "./proof";
-import { Link } from "./Link";
+import { SiteNav } from "./SiteNav";
 
 const GROUPS: { key: Check["group"]; title: string }[] = [
   { key: "Contract", title: "1. Contract" },
@@ -33,16 +32,7 @@ export default function ProofPage() {
   const failed = checks.filter((c) => !c.ok).length;
   return (
     <>
-      <header className="site-nav">
-        <div className="wrap">
-          <Logo />
-          <nav aria-label="Main">
-            <Link to="/#how">How it works</Link>
-            <Link to="/proof" aria-current="page" style={{ color: "var(--text)" }}>Proof</Link>
-            <Link to="/miner" className="btn">Open app</Link>
-          </nav>
-        </div>
-      </header>
+      <SiteNav />
       <main className="block">
         <div className="wrap">
           <div className="block-head">
