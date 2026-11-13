@@ -329,3 +329,19 @@ a.hist-row { color: inherit; }
 a.hist-row:hover { text-decoration: none; background: #c6f24e0a; }
 .lime { color: var(--lime); }
 @media (width <= 960px) { .bill-grid { grid-template-columns: 1fr; } .bill-head { flex-direction: column; align-items: flex-start; } }
+
+/* S6 host home */
+.host-home { display: grid; grid-template-columns: minmax(0, 540px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.issue { gap: 20px; }
+.issue .kicker, .host-bills .kicker { margin: 0; }
+.help.warn { color: var(--warn); }
+.host-bills .row { margin-bottom: 8px; }
+.host-row { display: grid; gap: 6px; padding: 18px 0; border-top: 1px solid var(--rule); color: inherit; }
+.host-row:hover { text-decoration: none; background: #c6f24e0a; }
+.host-row .row { margin: 0; }
+.host-row-main { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.host-row-main strong { font-size: 20px; }
+.host-row .mono { word-break: normal; overflow-wrap: anywhere; }
+input[type="date"] { color-scheme: dark; }
+.bill-main .kv-list .kv dd { overflow-wrap: anywhere; }
+@media (width <= 960px) { .host-home { grid-template-columns: 1fr; } }

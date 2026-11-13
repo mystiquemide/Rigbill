@@ -3,7 +3,7 @@ import { MEMPOOL_WEB } from "./config";
 import { fmtDate, fromNs, msg, sats, usd } from "./format";
 import { Lifecycle } from "./Lifecycle";
 import { Link } from "./Link";
-import { getBill, getOpenBill, getSplit, type Bill, type Split } from "./near";
+import { getBill, getOpenBill, getSplit, refetchBillUntilChanged, type Bill, type Split } from "./near";
 import { btcPriceUsd, usdToSats } from "./oneclick";
 import { SplitStatus } from "./SplitStatus";
 import { ErrorBox, ErrorNote, StatusTag } from "./ui";
@@ -29,6 +29,7 @@ export default function MinerBillDetail({ account, id }: { account: string; id: 
   }
 
   const other = openId && openId !== bill.id ? openId : null;
+  const afterTx = () => void refetchBillUntilChanged(id, bill.status).then(() => load()).catch((e) => setError(msg(e)));
   return (
     <div className="bill-detail">
       {back}
@@ -42,7 +43,7 @@ export default function MinerBillDetail({ account, id }: { account: string; id: 
       </header>
       <div className="bill-grid">
         <div className="bill-main">
-          {bill.status === "Issued" && (other ? <BlockedByOpen otherId={other} /> : <AcceptPanel bill={bill} onDone={load} />)}
+          {bill.status === "Issued" && (other ? <BlockedByOpen otherId={other} /> : <AcceptPanel bill={bill} onDone={afterTx} />)}
           {bill.status === "Accepted" && <Waiting text="You accepted this bill. Your host now locks a quote within your ceiling. Payouts stay at your address until then." />}
           {bill.status === "QuoteApproved" && <Waiting text={`Your host locked ${sats(Number(bill.quote!.amount_in_sats))}. Your next payout pays that to your host first and sends the rest to your wallet.`} tone="lime" />}
           {(bill.status === "Paying" || bill.status === "Paid") && <Receipt bill={bill} />}

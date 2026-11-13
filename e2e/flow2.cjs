@@ -7,7 +7,7 @@ const APP = process.env.E2E_APP || 'http://localhost:4173/';
 const path = require('path');
 const step = (s) => console.log(`\n=== ${s}`);
 async function signIn(p, hash) {
-  await p.goto(APP + hash, { waitUntil: 'networkidle' });
+  await p.goto(APP + hash, { waitUntil: 'load' });
   await p.getByRole('button', { name: /^Sign in with NEAR/ }).first().click();
   await sleep(1500);
   await p.getByText('E2E Test Wallet').first().click();
@@ -24,7 +24,7 @@ async function waitFor(p, re, ms = 120000) {
   const { page: h } = await rolePage(b, S.HOST, log);
 
   step('E. miner tries to sweep everything to cold while the bill is open');
-  await signIn(m, '#miner');
+  await signIn(m, 'miner');
   await waitFor(m, /Sweep [\d,]+ sats to cold/);
   await m.getByRole('button', { name: /Sweep [\d,]+ sats to cold/ }).click();
   await waitFor(m, /BILL_OPEN_HOST_OUTPUT_REQUIRED/);
@@ -43,14 +43,15 @@ async function waitFor(p, re, ms = 120000) {
   console.log(out.split('\n').filter((l) => /NEAR tx|"txid"|hostValue|coldValue|deposit"|Testnet/.test(l)).join('\n'));
 
   step('G. host sees Paying, confirms paid; miner sees Paid');
-  await signIn(h, '#host');
-  await h.getByRole('tab', { name: 'I host miners' }).click();
+  await signIn(h, 'host');
+  await waitFor(h, /Check the USDC, then confirm paid/);
+  await h.locator('a.host-row', { hasText: 'Check the USDC' }).first().click();
   await waitFor(h, /Confirm paid/);
   await h.getByRole('button', { name: 'Confirm paid' }).click();
-  await waitFor(h, /\| Paid \|/);
+  await waitFor(h, /PAID/i);
   await h.screenshot({ path: OUT + 'G-host-paid.png', fullPage: true });
-  await m.reload({ waitUntil: 'networkidle' });
-  await waitFor(m, /\| Paid \|/);
+  await m.reload({ waitUntil: 'load' });
+  await waitFor(m, /PAID/i);
   await sleep(3000);
   await m.screenshot({ path: OUT + 'G-miner-paid.png', fullPage: true });
   console.log('miner view:', (await text(m)).match(/\$6\.00[^]*?Refresh status/)?.[0]);

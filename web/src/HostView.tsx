@@ -1,44 +1,81 @@
 import { useCallback, useEffect, useState } from "react";
 import { coldAddressError, payoutFromDerivedKey } from "./btc";
-import { BILL_STORAGE_DEPOSIT, network } from "./config";
-import { derivedPublicKey, getBillsForHost, getMiner, type Bill } from "./near";
+import { BILL_STORAGE_DEPOSIT, MEMPOOL_WEB, network } from "./config";
+import { fmtDate, fmtTime, fromNs, msg, sats, toNs, usd } from "./format";
+import { Lifecycle } from "./Lifecycle";
+import { Link } from "./Link";
+import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, refetchBillUntilChanged, type Bill, type Split } from "./near";
 import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, usdToSats, type Quote } from "./oneclick";
-import { ErrorBox, StatusTag, ErrorNote } from "./ui";
-import { fmtDate, fmtTime, fromNs, msg, sats, toNs, usd, type Load } from "./format";
-import { callContract } from "./wallet";
+import { usePath } from "./routing";
 import { SplitStatus } from "./SplitStatus";
+import { ErrorBox, ErrorNote, StatusTag } from "./ui";
+import { callContract } from "./wallet";
 
 const QUOTE_TTL_DAYS = 3;
 const isEvm = (a: string) => /^0x[0-9a-fA-F]{40}$/.test(a.trim());
 
-/** Host view: issue bills (FR-003) and lock a 1Click quote for accepted ones (FR-005). */
+/** /host: S6 home, or S7 for /host/bills/:id. */
 export function HostView({ account }: { account: string }) {
-  const [bills, setBills] = useState<Load<Bill[]>>({ state: "loading" });
+  const id = usePath().match(/^\/host\/bills\/(\d+)$/)?.[1];
+  return id ? <HostBillDetail account={account} id={id} /> : <HostHome account={account} />;
+}
+
+// ---------------------------------------------------------------- S6
+
+function HostHome({ account }: { account: string }) {
+  const [bills, setBills] = useState<Bill[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
-    getBillsForHost(account)
-      .then((data) => setBills({ state: "ok", data }))
-      .catch((e) => setBills({ state: "error", error: msg(e) }));
+    getBillsForHost(account).then((b) => { setBills(b); setError(null); }).catch((e) => setError(msg(e)));
   }, [account]);
   useEffect(load, [load]);
+  // After issuing, wait until a lagging RPC node shows the new bill.
+  const afterIssue = async () => {
+    const before = bills?.length ?? 0;
+    for (let i = 0; i < 8; i++) {
+      const b = await getBillsForHost(account).catch(() => null);
+      if (b && b.length > before) return setBills(b);
+      await new Promise((r) => setTimeout(r, 1250));
+    }
+    load();
+  };
 
   return (
-    <>
-      <IssueForm onDone={load} />
-      {bills.state === "loading" && <section className="card muted">Loading your bills...</section>}
-      {bills.state === "error" && <ErrorBox what="Couldn't load your bills" error={bills.error} retry={load} />}
-      {bills.state === "ok" && (
-        <section className="card">
-          <div className="row">
-            <h2>Bills you issued</h2>
-            <button className="ghost" onClick={load}>Refresh</button>
-          </div>
-          {bills.data.length === 0 && <p className="muted">None yet. Issue one above.</p>}
-          {bills.data.map((b) => (
-            <HostBill key={b.id} bill={b} onDone={load} />
-          ))}
-        </section>
-      )}
-    </>
+    <div className="host-home">
+      <h1 className="sr-only">Your bills</h1>
+      <IssueForm onDone={() => void afterIssue()} />
+      <section className="panel host-bills" aria-labelledby="issued-title">
+        <div className="row"><p className="kicker" id="issued-title">Bills you issued</p>{bills && <span className="muted small">{bills.length} {bills.length === 1 ? "bill" : "bills"}</span>}</div>
+        {error && <ErrorBox what="Couldn't read your bills" error={error} retry={load} />}
+        {!bills && !error && <p className="skeleton">Reading your bills from the contract&hellip;</p>}
+        {bills?.length === 0 && <p className="note">None yet. Issue one with the form. It waits until the miner accepts it.</p>}
+        {bills?.map((b) => <HostRow key={b.id} bill={b} />)}
+      </section>
+    </div>
+  );
+}
+
+const NEXT: Record<Bill["status"], string> = {
+  Issued: "Waiting for the miner to accept",
+  Accepted: "Lock a quote",
+  QuoteApproved: "Waiting for the miner's next payout",
+  Paying: "Check the USDC, then confirm paid",
+  Paid: "Paid",
+  Expired: "Expired unpaid",
+  Withdrawn: "Withdrawn",
+};
+
+function HostRow({ bill }: { bill: Bill }) {
+  const action = bill.status === "Accepted" || bill.status === "Paying";
+  return (
+    <Link to={`/host/bills/${bill.id}`} className="host-row" aria-label={`Bill ${bill.id}, ${usd(Number(bill.usd_cents))}, ${bill.status}`}>
+      <div className="row">
+        <span className="host-row-main"><span className="mono muted">#{bill.id}</span><strong>{usd(Number(bill.usd_cents))}</strong><span className="muted">{bill.period}</span></span>
+        <StatusTag status={bill.status} />
+      </div>
+      <span className="mono small">to {bill.miner}</span>
+      <span className={action ? "lime small" : "muted small"}>{NEXT[bill.status]}</span>
+    </Link>
   );
 }
 
@@ -52,23 +89,21 @@ function IssueForm({ onDone }: { onDone: () => void }) {
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-
-  useEffect(() => {
-    btcPriceUsd().then(setPrice).catch(() => setPrice(null));
-  }, []);
+  const [now] = useState(() => Date.now());
+  useEffect(() => { btcPriceUsd().then(setPrice).catch(() => setPrice(null)); }, []);
 
   const cents = Math.round(Number(amount) * 100);
-  const [now] = useState(() => Date.now());
   const dueDate = new Date(due + "T23:59:59");
   const errs = {
     miner: /^[a-z0-9._-]{2,64}$/.test(miner.trim()) ? null : "Enter the miner's NEAR account.",
-    amount: Number.isFinite(cents) && cents > 0 ? null : "Enter the bill amount in USD.",
+    amount: Number.isFinite(cents) && cents > 0 ? null : "Enter the bill amount in US dollars.",
     period: period.trim() && period.length <= 64 ? null : "Describe the period in up to 64 characters.",
     due: dueDate.getTime() > now ? null : "The due date must be in the future.",
-    addr: isEvm(addr) ? null : "Enter the Base address that receives USDC (0x followed by 40 hex characters).",
+    addr: isEvm(addr) ? null : "Enter a Base address: 0x followed by 40 hex characters.",
   };
   const estSats = price && cents > 0 ? usdToSats(cents, price) : null;
   const belowMin = estSats !== null && estSats < ONECLICK_MIN_SATS;
+  const bad = (k: keyof typeof errs) => touched && !!errs[k];
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,15 +113,8 @@ function IssueForm({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       if (!(await getMiner(miner.trim()))) throw new Error("MINER_NOT_REGISTERED");
-      await callContract(
-        "issue_bill",
-        { miner: miner.trim(), usd_cents: String(cents), period: period.trim(), due_ns: toNs(dueDate), host_address: addr.trim() },
-        BILL_STORAGE_DEPOSIT,
-        30n,
-      );
-      setMiner("");
-      setAmount("");
-      setTouched(false);
+      await callContract("issue_bill", { miner: miner.trim(), usd_cents: String(cents), period: period.trim(), due_ns: toNs(dueDate), host_address: addr.trim() }, BILL_STORAGE_DEPOSIT, 30n);
+      setMiner(""); setAmount(""); setTouched(false);
       onDone();
     } catch (err) {
       setError(err);
@@ -95,42 +123,90 @@ function IssueForm({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const show = (k: keyof typeof errs) => touched && errs[k] && <p className="err">{errs[k]}</p>;
+  const amountHelp: string = bad("amount") ? errs.amount ?? ""
+    : estSats !== null ? `About ${sats(estSats)} at $${price!.toLocaleString("en-US")} per BTC.${belowMin ? ` That's under 1Click's ${sats(ONECLICK_MIN_SATS)} minimum, so a quote for it can't be locked.` : ""}`
+    : "The miner's payouts pay this in USDC on Base.";
   return (
-    <form className="card" onSubmit={submit} noValidate>
-      <h2>Issue a bill</h2>
-      <label>Miner's NEAR account<input value={miner} onChange={(e) => setMiner(e.target.value)} placeholder={network === "testnet" ? "miner.testnet" : "miner.near"} spellCheck={false} /></label>
-      {show("miner")}
-      <label>Amount (USD)<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="150.00" /></label>
-      {show("amount")}
-      {estSats !== null && (
-        <p className={belowMin ? "warn small" : "small muted"}>
-          About {sats(estSats)} at today's price.
-          {belowMin && ` That's under 1Click's ${sats(ONECLICK_MIN_SATS)} minimum, so a quote for it can't be approved.`}
-        </p>
-      )}
-      <label>Period<input value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
-      {show("period")}
-      <label>Due date<input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></label>
-      {show("due")}
-      <label>Your Base address for USDC<input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x..." spellCheck={false} /></label>
-      {show("addr")}
-      <p className="small muted">Issuing locks 0.01 NEAR for storage. The bill does nothing until the miner accepts it.</p>
+    <form className="panel form issue" onSubmit={submit} noValidate aria-labelledby="issue-title">
+      <div>
+        <p className="kicker" id="issue-title">Issue a bill</p>
+        <p className="muted" style={{ margin: "14px 0 0", fontSize: 15 }}>Bill a miner in US dollars. You get USDC on Base when their next payout lands.</p>
+      </div>
+      <Field id="miner" label="Miner's NEAR account" value={miner} set={setMiner} help={bad("miner") ? errs.miner! : "The account the miner signs in to Rigbill with."} bad={bad("miner")} />
+      <Field id="amount" label="Amount (USD)" value={amount} set={setAmount} help={amountHelp} bad={bad("amount")} warn={belowMin} mode="decimal" />
+      <Field id="period" label="Period" value={period} set={setPeriod} help={bad("period") ? errs.period! : "Shown to the miner on the bill."} bad={bad("period")} />
+      <Field id="due" label="Due date" value={due} set={setDue} type="date" help={bad("due") ? errs.due! : "If it's still unpaid 7 days after this date, the bill expires."} bad={bad("due")} />
+      <Field id="addr" label="Your Base address for USDC" value={addr} set={setAddr} help={bad("addr") ? errs.addr! : "Your own wallet on Base. USDC goes straight there. Rigbill never holds it."} bad={bad("addr")} />
       {error != null && <ErrorNote error={error} />}
-      <button type="submit" disabled={busy}>{busy ? "Waiting for wallet..." : "Issue bill"}</button>
+      <div className="form-actions"><button type="submit" disabled={busy}>{busy ? "Waiting for your wallet…" : "Issue bill"}</button></div>
+      <p className="help" style={{ marginTop: -10 }}>Locks 0.01 NEAR for storage. The bill does nothing until the miner accepts it.</p>
     </form>
   );
 }
 
-function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const [now] = useState(() => Date.now());
-  const quoteExpired = bill.quote && fromNs(bill.quote.deadline_ns).getTime() <= now;
-  const needsQuote = bill.status === "Accepted" || (bill.status === "QuoteApproved" && quoteExpired);
+function Field({ id, label, value, set, help, bad, warn, type = "text", mode }: { id: string; label: string; value: string; set: (v: string) => void; help: string; bad: boolean; warn?: boolean; type?: string; mode?: "decimal" }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} type={type} value={value} onChange={(e) => set(e.target.value)} spellCheck={false} autoComplete="off" inputMode={mode} aria-invalid={bad} aria-describedby={`${id}-help`} />
+      <p id={`${id}-help`} className={bad ? "help bad" : warn ? "help warn" : "help"}>{help}</p>
+    </div>
+  );
+}
 
+// ---------------------------------------------------------------- S7
+
+function HostBillDetail({ account, id }: { account: string; id: string }) {
+  const [bill, setBill] = useState<Bill | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    getBill(id).then((b) => { setBill(b); setError(null); }).catch((e) => setError(msg(e)));
+  }, [id]);
+  useEffect(load, [load]);
+
+  const back = <Link to="/host" className="back-link">Back to your bills</Link>;
+  if (error) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={error} retry={load} /></>;
+  if (bill === undefined) return <>{back}<p className="skeleton">Reading bill #{id} from the contract&hellip;</p></>;
+  if (bill === null || bill.host !== account) {
+    return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: "14px 0 0" }}>There is no bill #{id} issued by {account}.</p></section></>;
+  }
+  const afterTx = () => void refetchBillUntilChanged(id, bill.status).then((b) => setBill(b)).catch((e) => setError(msg(e)));
+  return <HostBill bill={bill} back={back} onChanged={afterTx} />;
+}
+
+function HostBill({ bill, back, onChanged }: { bill: Bill; back: React.ReactNode; onChanged: () => void }) {
+  const [now] = useState(() => Date.now());
+  const quoteExpired = !!bill.quote && fromNs(bill.quote.deadline_ns).getTime() <= now;
+  const needsQuote = bill.status === "Accepted" || (bill.status === "QuoteApproved" && quoteExpired);
+  return (
+    <div className="bill-detail">
+      {back}
+      <header className="bill-head">
+        <div>
+          <p className="kicker">Bill #{bill.id}</p>
+          <h1 className="h2 bill-title">{usd(Number(bill.usd_cents))} for {bill.period}</h1>
+          <p className="muted">To <span className="mono">{bill.miner}</span>{bill.ceiling_sats ? `, ceiling ${sats(Number(bill.ceiling_sats))}` : ""}, due {fmtDate(fromNs(bill.due_ns))}</p>
+        </div>
+        {bill.status === "Accepted" ? <span className="chip chip-warn">Needs a quote</span> : <StatusTag status={bill.status} />}
+      </header>
+      <div className="bill-grid">
+        <div className="bill-main">
+          {bill.status === "Issued" && <IssuedPanel bill={bill} onChanged={onChanged} />}
+          {needsQuote && <LockQuote bill={bill} expired={quoteExpired} onDone={onChanged} />}
+          {bill.status === "QuoteApproved" && !quoteExpired && <LockedPanel bill={bill} />}
+          {(bill.status === "Paying" || bill.status === "Paid") && <PaymentPanel bill={bill} onChanged={onChanged} />}
+        </div>
+        <Lifecycle bill={bill} side="host" />
+      </div>
+    </div>
+  );
+}
+
+function useAct(bill: Bill, onDone: () => void) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const act = (method: "withdraw_bill" | "confirm_paid" | "report_refund") => async () => {
-    setBusy(true);
+    setBusy(method);
     setError(null);
     try {
       await callContract(method, { bill_id: bill.id }, 0n, 30n);
@@ -138,55 +214,73 @@ function HostBill({ bill, onDone }: { bill: Bill; onDone: () => void }) {
     } catch (e) {
       setError(e);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
+  return { busy, error, act };
+}
 
+function IssuedPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }) {
+  const { busy, error, act } = useAct(bill, onChanged);
   return (
-    <div className="bill">
-      <div className="row">
-        <div>
-          <strong>{usd(Number(bill.usd_cents))}</strong> <span className="muted">for {bill.period}</span>
-          <div className="small muted">
-            #{bill.id} to <span className="mono">{bill.miner}</span>, due {fmtDate(fromNs(bill.due_ns))}
-          </div>
-        </div>
-        <StatusTag status={bill.status} />
-      </div>
-      {bill.ceiling_sats && <div className="small">Miner's ceiling: {sats(Number(bill.ceiling_sats))}</div>}
-      {bill.quote && (
-        <div className="small">
-          Locked quote: {sats(Number(bill.quote.amount_in_sats))} to <span className="mono">{bill.quote.deposit_address}</span>,
-          valid until {fmtTime(fromNs(bill.quote.deadline_ns))}
-          {quoteExpired && <span className="warn"> (expired, lock a new one)</span>}
-        </div>
-      )}
-      {bill.status === "Issued" && (
-        <div className="row">
-          <span className="small muted">Waiting for the miner to accept.</span>
-          <button className="ghost" onClick={act("withdraw_bill")} disabled={busy}>Withdraw</button>
-        </div>
-      )}
-      <SplitStatus bill={bill} />
-      {bill.status === "Paying" && (
-        <div className="accept">
-          <p className="small">
-            Check that the USDC reached <span className="mono">{bill.host_address}</span> (the Basescan link above on
-            mainnet), then confirm. If 1Click refunded the swap, report it and lock a new quote.
-          </p>
-          <div className="row">
-            <button onClick={act("confirm_paid")} disabled={busy}>Confirm paid</button>
-            <button className="ghost" onClick={act("report_refund")} disabled={busy}>Report refund</button>
-          </div>
-        </div>
-      )}
-      {needsQuote && <ApproveQuote bill={bill} onDone={onDone} />}
+    <section className="panel">
+      <h2 className="panel-title">Waiting for the miner</h2>
+      <p className="note note-review"><span><span className="mono">{bill.miner}</span> sees this bill in Rigbill and sets the most it can cost. Until then it changes nothing for them.</span></p>
+      <p className="muted" style={{ margin: "16px 0", fontSize: 15 }}>Made a mistake? You can withdraw the bill until the miner accepts it.</p>
+      <button className="ghost" onClick={act("withdraw_bill")} disabled={!!busy}>{busy ? "Waiting for your wallet…" : "Withdraw bill"}</button>
       {error != null && <ErrorNote error={error} />}
-    </div>
+    </section>
   );
 }
 
-function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
+function LockedPanel({ bill }: { bill: Bill }) {
+  const q = bill.quote!;
+  return (
+    <section className="panel">
+      <h2 className="panel-title">Quote locked</h2>
+      <dl className="kv-list">
+        <div className="kv"><dt>Miner pays</dt><dd className="num">{sats(Number(q.amount_in_sats))}</dd></div>
+        <div className="kv"><dt>Deposit address</dt><dd className="num">{q.deposit_address}</dd></div>
+        <div className="kv"><dt>Valid until</dt><dd className="num">{fmtTime(fromNs(q.deadline_ns))}</dd></div>
+        <div className="kv"><dt>You receive</dt><dd>{usd(Number(bill.usd_cents))} USDC on Base at <span className="mono">{bill.host_address}</span></dd></div>
+      </dl>
+      <p className="note note-lime">The miner's next payout sends exactly this to the deposit address before anything reaches their wallet.</p>
+    </section>
+  );
+}
+
+function PaymentPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }) {
+  const { busy, error, act } = useAct(bill, onChanged);
+  const [split, setSplit] = useState<Split | null>(null);
+  useEffect(() => { if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null)); }, [bill.split_id]);
+  const [toHost, toMiner] = split?.outputs ?? [];
+  const paying = bill.status === "Paying";
+  return (
+    <section className="panel">
+      <h2 className="panel-title">{paying ? "The miner's payout was split" : "Paid"}</h2>
+      {split && (
+        <dl className="kv-list">
+          {toHost && <div className="kv"><dt>To deposit</dt><dd className="num">{sats(Number(toHost.value))}</dd></div>}
+          {toMiner && <div className="kv"><dt>To miner</dt><dd className="num">{sats(Number(toMiner.value))}</dd></div>}
+          <div className="kv"><dt>Bitcoin split</dt><dd className="num"><a href={`${MEMPOOL_WEB}/tx/${split.txid}`} target="_blank" rel="noreferrer">{split.txid}</a></dd></div>
+        </dl>
+      )}
+      <div style={{ marginTop: 16 }}><SplitStatus bill={bill} /></div>
+      {paying && (
+        <>
+          <p className="note note-review">Check that {usd(Number(bill.usd_cents))} USDC reached <span className="mono">{bill.host_address}</span>, then confirm. If 1Click refunded the swap, report it and lock a new quote.</p>
+          <div className="actions">
+            <button onClick={act("confirm_paid")} disabled={!!busy}>{busy === "confirm_paid" ? "Waiting for your wallet…" : "Confirm paid"}</button>
+            <button className="ghost" onClick={act("report_refund")} disabled={!!busy}>{busy === "report_refund" ? "Waiting for your wallet…" : "1Click refunded it"}</button>
+          </div>
+        </>
+      )}
+      {error != null && <ErrorNote error={error} />}
+    </section>
+  );
+}
+
+function LockQuote({ bill, expired, onDone }: { bill: Bill; expired: boolean; onDone: () => void }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [standin, setStandin] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -196,7 +290,7 @@ function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
   const testnet = network === "testnet";
 
   const fetchQuote = async () => {
-    setBusy("Requesting a live 1Click quote...");
+    setBusy("Requesting a live quote…");
     setError(null);
     try {
       const refundTo = payoutFromDerivedKey(await derivedPublicKey(bill.miner)).address;
@@ -227,15 +321,10 @@ function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
       const err = coldAddressError(deposit);
       if (err) return setError(err);
     }
-    setBusy("Waiting for wallet...");
+    setBusy("Waiting for your wallet…");
     setError(null);
     try {
-      await callContract(
-        "approve_quote",
-        { bill_id: bill.id, deposit_address: deposit, amount_in_sats: quote.amountIn, deadline_ns: toNs(new Date(quote.deadline)) },
-        0n,
-        30n,
-      );
+      await callContract("approve_quote", { bill_id: bill.id, deposit_address: deposit, amount_in_sats: quote.amountIn, deadline_ns: toNs(new Date(quote.deadline)) }, 0n, 30n);
       onDone();
     } catch (e) {
       setError(e);
@@ -245,48 +334,39 @@ function ApproveQuote({ bill, onDone }: { bill: Bill; onDone: () => void }) {
   };
 
   return (
-    <div className="accept">
-      {!quote && (
-        <button onClick={fetchQuote} disabled={!!busy}>{busy ?? "Get quote"}</button>
-      )}
+    <section className="panel" aria-labelledby="quote-title">
+      <h2 className="panel-title" id="quote-title">{expired ? "Lock a new quote" : "Lock a NEAR Intents quote"}</h2>
+      <p className="muted" style={{ margin: "0 0 16px", fontSize: 15 }}>
+        {expired ? "The last quote expired before a payout arrived. " : ""}
+        The miner's next payout sends exactly the quoted sats to the deposit address, and 1Click swaps them into your USDC.
+      </p>
+      {!quote && <button onClick={fetchQuote} disabled={!!busy}>{busy ?? "Get a live quote"}</button>}
       {quote && (
         <>
-          <dl>
-            <dt>You receive</dt>
-            <dd>{usd(cents)} USDC on Base at <span className="mono">{bill.host_address}</span></dd>
-            <dt>Miner pays</dt>
-            <dd>{sats(amountIn)} (ceiling {sats(ceiling)})</dd>
-            <dt>Quote valid until</dt>
-            <dd>{quote.deadline ? fmtTime(new Date(quote.deadline)) : "unknown"}</dd>
-            {!testnet && (
-              <>
-                <dt>1Click deposit</dt>
-                <dd className="mono">{quote.depositAddress}</dd>
-              </>
-            )}
+          <dl className="kv-list">
+            <div className="kv"><dt>You receive</dt><dd>{usd(cents)} USDC on Base</dd></div>
+            <div className="kv"><dt>To</dt><dd className="num">{bill.host_address}</dd></div>
+            <div className="kv"><dt>Miner pays</dt><dd className="num">{sats(amountIn)} (ceiling {sats(ceiling)})</dd></div>
+            <div className="kv"><dt>Valid until</dt><dd className="num">{quote.deadline ? fmtTime(new Date(quote.deadline)) : "Set by 1Click"}</dd></div>
+            {!testnet && <div className="kv"><dt>1Click deposit</dt><dd className="num">{quote.depositAddress}</dd></div>}
+            {!testnet && quote.timeEstimate > 0 && <div className="kv"><dt>Swap time</dt><dd>about {Math.round(quote.timeEstimate / 60)} minutes after confirmation</dd></div>}
           </dl>
           {testnet && (
-            <>
-              <p className="small warn">
-                Testnet: NEAR Intents has no testnet, so there's no real 1Click deposit address. The amount uses the live
-                BTC price. Enter a testnet address you control as a stand-in for the deposit address.
-              </p>
-              <label>Stand-in deposit address (testnet)<input value={standin} onChange={(e) => setStandin(e.target.value)} placeholder="tb1q..." spellCheck={false} /></label>
-            </>
+            <div className="field" style={{ marginTop: 16 }}>
+              <label htmlFor="standin">Stand-in deposit address (testnet)</label>
+              <input id="standin" value={standin} onChange={(e) => setStandin(e.target.value)} spellCheck={false} autoComplete="off" aria-describedby="standin-help" />
+              <p id="standin-help" className="help warn">NEAR Intents has no testnet, so there's no real 1Click deposit address. Enter a testnet address you control. The amount uses the live BTC price.</p>
+            </div>
           )}
-          {overCeiling && (
-            <p className="err">
-              This quote needs more than the miner's ceiling, so the contract will refuse it (QUOTE_OVER_CEILING). Ask the
-              miner to accept a higher ceiling on a new bill, or wait for a better price.
-            </p>
-          )}
-          <div className="row">
-            <button onClick={approve} disabled={!!busy}>{busy ?? "Approve quote on-chain"}</button>
-            <button className="ghost" onClick={() => setQuote(null)} disabled={!!busy}>Discard</button>
+          {overCeiling && <p className="note note-lost">This quote needs more than the miner's ceiling, so the contract would refuse it (QUOTE_OVER_CEILING). Get a new quote when the price moves back.</p>}
+          <div className="actions">
+            <button onClick={approve} disabled={!!busy || overCeiling}>{busy ?? "Lock this quote"}</button>
+            <button className="ghost" onClick={fetchQuote} disabled={!!busy}>Get a new quote</button>
           </div>
+          <p className="note">If the swap is ever refunded, the BTC goes back to the miner's payout address, never to Rigbill.</p>
         </>
       )}
       {error != null && <ErrorNote error={error} />}
-    </div>
+    </section>
   );
 }

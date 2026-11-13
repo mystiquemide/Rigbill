@@ -96,3 +96,14 @@ export async function txResult(hash: string, sender: string): Promise<TxResult> 
 }
 
 export const getBill = (id: string) => view<Bill | null>(CONTRACT_ID, "get_bill", { bill_id: id });
+
+/** After a transaction, public RPC nodes can lag a block behind. Re-read until the bill changes. */
+export async function refetchBillUntilChanged(id: string, before: Bill["status"] | undefined, tries = 8): Promise<Bill | null> {
+  let b: Bill | null = null;
+  for (let i = 0; i < tries; i++) {
+    b = await getBill(id);
+    if (!b || b.status !== before) return b;
+    await new Promise((r) => setTimeout(r, 1250));
+  }
+  return b;
+}

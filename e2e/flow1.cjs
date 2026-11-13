@@ -8,7 +8,7 @@ const APP = process.env.E2E_APP || 'http://localhost:4173/';
 const BASE = '0x3333333333333333333333333333333333333333';
 const step = (s) => console.log(`\n=== ${s}`);
 async function signIn(p, hash) {
-  await p.goto(APP + hash, { waitUntil: 'networkidle' });
+  await p.goto(APP + hash, { waitUntil: 'load' });
   await p.getByRole('button', { name: /^Sign in with NEAR/ }).first().click();
   await sleep(1500);
   await p.getByText('E2E Test Wallet').first().click();
@@ -25,7 +25,7 @@ async function waitFor(p, re, ms = 90000) {
   const { page: h } = await rolePage(b, HOST, log);
 
   step('A. miner signs in and registers');
-  await signIn(m, '#miner');
+  await signIn(m, 'miner');
   await m.getByLabel('Cold wallet address').fill(COLD);
   await m.getByRole('button', { name: 'Register' }).click();
   await waitFor(m, /Your payout address/);
@@ -34,8 +34,7 @@ async function waitFor(p, re, ms = 90000) {
   await m.screenshot({ path: OUT + 'A-miner-registered.png', fullPage: true });
 
   step('B. host signs in and issues a $6 bill');
-  await signIn(h, '#host');
-  await h.getByRole('tab', { name: 'I host miners' }).click();
+  await signIn(h, 'host');
   await h.getByLabel("Miner's NEAR account").fill(MINER);
   await h.getByLabel('Amount (USD)').fill('6.00');
   await h.getByLabel('Your Base address for USDC').fill(BASE);
@@ -44,23 +43,26 @@ async function waitFor(p, re, ms = 90000) {
   await h.screenshot({ path: OUT + 'B-host-issued.png', fullPage: true });
 
   step('C. miner accepts with the pre-filled ceiling');
-  await m.reload({ waitUntil: 'networkidle' });
+  await m.reload({ waitUntil: 'load' });
+  await waitFor(m, /Review and accept/);
+  await m.locator('a.hist-row', { hasText: 'Review and accept' }).first().click();
   await waitFor(m, /Accept bill/);
   const ceiling = await m.getByLabel("Most sats you'll allow for this bill").inputValue();
   console.log('pre-filled ceiling:', ceiling);
   await m.getByRole('button', { name: 'Accept bill' }).click();
-  await waitFor(m, /Accepted, needs quote/);
+  await waitFor(m, /You accepted this bill/);
   await m.screenshot({ path: OUT + 'C-miner-accepted.png', fullPage: true });
 
   step('D. host gets a quote and approves it (testnet stand-in deposit)');
-  await h.reload({ waitUntil: 'networkidle' });
-  await h.getByRole('tab', { name: 'I host miners' }).click();
-  await waitFor(h, /Get quote/);
-  await h.getByRole('button', { name: 'Get quote' }).click();
+  await h.reload({ waitUntil: 'load' });
+  await waitFor(h, /Lock a quote/);
+  await h.locator('a.host-row', { hasText: 'Lock a quote' }).first().click();
+  await waitFor(h, /Get a live quote/);
+  await h.getByRole('button', { name: 'Get a live quote' }).click();
   await waitFor(h, /Stand-in deposit address/);
   await h.getByLabel('Stand-in deposit address (testnet)').fill(STANDIN);
-  await h.getByRole('button', { name: 'Approve quote on-chain' }).click();
-  await waitFor(h, /Quote locked, waiting for payout/);
+  await h.getByRole('button', { name: 'Lock this quote' }).click();
+  await waitFor(h, /The miner's next payout sends exactly this/);
   await h.screenshot({ path: OUT + 'D-host-quote.png', fullPage: true });
 
   fs.writeFileSync(OUT + 'state.json', JSON.stringify({ MINER, HOST, payout, COLD, STANDIN }, null, 2));
