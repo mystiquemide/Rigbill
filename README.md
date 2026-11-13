@@ -74,8 +74,10 @@ cd contract && cargo test
 ```
 
 ```bash
-cargo build --target wasm32-unknown-unknown --release
+./build.sh
 ```
+
+`build.sh` compiles to wasm and shrinks it with Binaryen's `wasm-opt` into `contract/out/rigbill.wasm`.
 
 ## Repository
 
