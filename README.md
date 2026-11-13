@@ -37,6 +37,8 @@ It reads the contract and both chains live, then checks that the payout address 
 | Refused: a third output | [3m3KTFmS…](https://testnet.nearblocks.io/txns/3m3KTFmSdhyLvfdDWsk68nUaAUPxwbpt6G6HLLKoXUy5) `OUTPUT_NOT_ALLOWED` |
 | Refused: spending a payout that was already signed | [6qv2g2Uk…](https://testnet.nearblocks.io/txns/6qv2g2Uk1P6AmE3SdptprKu8kJ8T5UMDxGyGA9GiGUmQ) `OUTPOINT_ALREADY_SIGNED` |
 
+The same loop also ran through the web app with fresh accounts (`e2e/`): the miner's sweep to cold was [refused in the UI](https://testnet.nearblocks.io/txns/9MUxwPwg3o3ScCiv79R7ebHhJ5nvz8urHAcMrgARy72Z), then the payout [paid the $6 bill](https://mempool.space/testnet4/tx/b0a874bc798c64d7f513605aaab5e58e021eb4b935f7dce90f161fe17b4ccdd9) and the host confirmed it.
+
 NEAR Intents has no testnet, so on testnet the host's output goes to a stand-in deposit address and there is no USDC leg. The demo payout comes from the miner's own testnet wallet, standing in for a pool.
 
 ## Run it
@@ -87,6 +89,7 @@ cd contract && cargo test
 | `relayer/` | CLI: derive, split, verify signatures, broadcast, 1Click deposit and status, `verify` |
 | `web/` | Miner and host views with NEAR wallet sign-in |
 | `proof/` | Refusal transactions that `npm run verify` checks |
+| `e2e/` | Browser end-to-end test of the web app on testnet |
 
 ## Limits
 
