@@ -9,7 +9,8 @@
     "relayer": "tsx src/cli.ts",
     "test": "NETWORK=mainnet tsx --test test/*.test.ts",
     "typecheck": "tsc",
-    "verify": "tsx src/verify.ts"
+    "verify": "tsx src/verify.ts",
+    "agent": "tsx src/agent.ts"
   },
   "license": "MIT",
   "dependencies": {

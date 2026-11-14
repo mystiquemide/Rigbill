@@ -115,13 +115,15 @@ Everything here was written from 2026-11-12. The whole loop has run on mainnet: 
 
 An AI agent can run either side of Rigbill without being trusted. The contract decides what can be signed, so a buggy or compromised agent can fail to act but can't move money anywhere the rules don't allow.
 
-**As the miner's relayer.** The miner approves the agent's NEAR account under Approved relayers in the app (`set_relayers`). The agent then watches the payout address and, when a payout confirms, runs:
+**As the miner's relayer.** The repo ships a keeper agent for this. The miner approves the agent's NEAR account under Approved relayers in the app (`set_relayers`), then the agent runs on its own:
 
 ```bash
-npm run relayer -- split <miner.near>
+cd relayer && npm run agent -- <miner.near> [more miners] --interval 60
 ```
 
-That builds the split, asks the contract for MPC signatures (`sign_split`), checks every signature against the payout key, broadcasts to Bitcoin and hands the deposit to 1Click. The contract only signs a split that pays the open bill first and sends the rest to the miner's own wallet.
+Every interval, for each miner, it reads the open bill, skips payouts already reserved in a signed split, and decides: wait (no quote yet, quote expired, fee over the miner's cap, too little to cover the bill), stay idle, or split. To split it asks the contract for MPC signatures (`sign_split`), checks the contract built the same transaction, verifies every signature against the payout key, broadcasts to Bitcoin and hands the deposit to 1Click. While a bill is being paid it reports the 1Click swap, so the host knows when to confirm. It logs one JSON line per decision, and `--dry-run` shows what it would do without sending anything. One miner's error never stops the others. The decision logic is a pure function with its own tests (`relayer/test/decide.test.ts`).
+
+The contract only signs a split that pays the open bill first and sends the rest to the miner's own wallet, so the agent holds no power over anyone's Bitcoin.
 
 **As the host's billing agent.** The agent signs in with the host's account and calls the contract directly:
 
@@ -190,7 +192,7 @@ cd contract && cargo test
 npm test
 ```
 
-Runs 80 contract tests (split rules, who may request a split, per-miner outpoints, storage cost, releasing an unused split, every refusal, BIP143 sighash vectors, bill lifecycle, quote ceiling and expiry) and 8 relayer tests (transaction parity with the contract, signature checks). CI runs these on every push along with clippy, the web build and `npm run verify` against the live chains.
+Runs 80 contract tests (split rules, who may request a split, per-miner outpoints, storage cost, releasing an unused split, every refusal, BIP143 sighash vectors, bill lifecycle, quote ceiling and expiry) and 15 relayer tests (transaction parity with the contract, signature checks, the agent's split decisions). CI runs these on every push along with clippy, the web build and `npm run verify` against the live chains.
 
 ## Repository
 
