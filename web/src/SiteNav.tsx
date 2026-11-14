@@ -21,7 +21,7 @@ export function SiteNav() {
   ];
   const done = () => setOpen(false);
   return (
-    <header className="site-nav">
+    <header className="site-nav on-dark">
       <div className="wrap">
         <Logo />
         <nav aria-label="Main" className="site-links">

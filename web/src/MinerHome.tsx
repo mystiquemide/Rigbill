@@ -52,7 +52,7 @@ function PayoutCard({ address, pending }: { address: string; pending: boolean })
   };
   const toggleQr = async () => {
     if (qr) return setQr(null);
-    setQr(await QRCode.toString(`bitcoin:${address}`, { type: "svg", margin: 1, color: { dark: "#141d08", light: "#ecf2e0" } }));
+    setQr(await QRCode.toString(`bitcoin:${address}`, { type: "svg", margin: 1, color: { dark: "#000000", light: "#ffffff" } }));
   };
   return (
     <section className="panel payout" aria-labelledby="payout-title">

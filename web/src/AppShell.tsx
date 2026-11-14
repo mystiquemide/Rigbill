@@ -15,7 +15,7 @@ export function AppShell({ active, children }: { active: Tab; children: (account
 
   return (
     <>
-      <header className="app-nav">
+      <header className="app-nav on-dark">
         <div className="wrap">
           <Logo />
           <nav className="app-tabs" aria-label="App">
