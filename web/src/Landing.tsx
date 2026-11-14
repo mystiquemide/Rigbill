@@ -27,7 +27,7 @@ export default function Landing() {
                 <h2>Set up your payout address in two minutes</h2>
                 <p>Sign in with any NEAR wallet, add your cold wallet, and paste the new address into your pool.</p>
               </div>
-              <Link to="/miner" className="btn">Open app</Link>
+              <Link to="/miner" className="btn btn-cta">Open app</Link>
             </div>
           </div>
         </section>
@@ -52,26 +52,62 @@ export default function Landing() {
 }
 
 function Hero() {
+  const [paid, setPaid] = useState<PaidBill | null | undefined>(undefined);
+  useEffect(() => {
+    if (!proofFile) return setPaid(null);
+    latestPaidBill(proofFile.miner).then(setPaid).catch(() => setPaid(null));
+  }, []);
   return (
     <section className="hero" aria-labelledby="hero-title">
-      <div className="wrap">
-        <div className="hero-copy">
-          <p className="kicker" style={{ margin: "0 0 28px" }}>Bitcoin payouts for miners and hosts</p>
-          <h1 id="hero-title" className="h1">
-            Your payouts pay the hosting bill <em>The rest goes to your wallet</em>
-          </h1>
-          <p>
-            A Bitcoin payout address no one holds a key to. A NEAR contract signs only transactions that pay your host
-            first, in USDC, then send everything else to your own wallet.
-          </p>
-          <div className="cta-row">
-            <Link to="/miner" className="btn">Open app</Link>
-            <Link to="/proof" className="arrow-link">See it working on chain</Link>
-          </div>
+      <div className="wrap hero-inner">
+        <Link to="/proof" className="news-pill">
+          <span className="news-tag">Live</span>
+          {proofFile ? `Running on NEAR ${proofFile.network} and Bitcoin` : "Read the proof"}
+          <span aria-hidden="true" className="news-arrow">&rarr;</span>
+        </Link>
+        <h1 id="hero-title" className="h1 hero-title">Your payout pays the bill first</h1>
+        <p className="hero-sub">
+          A Bitcoin payout address that pays your hosting bill in USDC, then sends everything else to your own wallet.
+          No one holds its key.
+        </p>
+        <div className="cta-row hero-ctas">
+          <Link to="/miner" className="btn btn-cta">Open the app</Link>
+          <Link to="/proof" className="btn btn-dark">See the proof</Link>
         </div>
-        <LiveBill />
+      </div>
+      <div className="wrap">
+        <ul className="trust" aria-label="On chain right now">
+          <li>
+            <span className="trust-icon" aria-hidden="true"><Icon d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></span>
+            <div>
+              <strong>{paid === undefined ? "Reading the latest bill" : paid ? `Bill #${paid.bill.id} paid` : "No paid bill yet"}</strong>
+              <span>{paid ? `${usd(paid.bill.usd_cents)} bill, paid in USDC on Base` : "Read live from the contract"}</span>
+            </div>
+          </li>
+          <li>
+            <span className="trust-icon" aria-hidden="true"><Icon d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z" /></span>
+            <div>
+              <strong>{proofFile ? `${proofFile.refusals.length} refusals on chain` : "Refusals on chain"}</strong>
+              <span>Sweeps that skipped the bill, rejected</span>
+            </div>
+          </li>
+          <li>
+            <span className="trust-icon" aria-hidden="true"><Icon d="M15 7a4 4 0 1 1-3.5 6L5 19.5V22h3v-2h2v-2h2l1.5-1.5A4 4 0 0 1 15 7Z" /></span>
+            <div>
+              <strong>No company key</strong>
+              <span>NEAR Chain Signatures holds it</span>
+            </div>
+          </li>
+        </ul>
+        <div className="hero-bill"><LiveBill /></div>
       </div>
     </section>
+  );
+}
+
+function Icon({ d }: { d: string }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
   );
 }
 
@@ -141,12 +177,12 @@ function Doors() {
         </div>
         <div className="doors">
           {doors.map((d) => (
-            <article key={d.k} className="panel door">
+            <article key={d.k} className="door">
               <p className="kicker">{d.k}</p>
               <h3>{d.t}</h3>
               <p>{d.d}</p>
               <ul>{d.pts.map((p) => <li key={p}>{p}</li>)}</ul>
-              <Link to={d.to} className="btn">{d.cta}</Link>
+              <Link to={d.to} className="btn btn-dark">{d.cta}</Link>
             </article>
           ))}
         </div>
@@ -209,12 +245,13 @@ function ProofSummary() {
   useEffect(() => {
     runChecks(setChecks).then(() => setStatus("done")).catch(() => setStatus("error"));
   }, []);
-  const groups = ["Contract", "Payout address", "Bills", "Refusals"] as const;
+  const groups = ["Contract", "Payout address", "Bills", "Refusals", "1Click"] as const;
   const summary: Record<(typeof groups)[number], string> = {
     Contract: "Contract signs through the NEAR MPC network",
     "Payout address": "Payout address comes from the MPC key",
     Bills: "Bitcoin splits match what the contract signed",
     Refusals: "Every refusal failed without reaching the signer",
+    "1Click": "1Click quotes the USDC route live",
   };
   return (
     <section id="proof" className="block" aria-labelledby="proof-title">
@@ -229,7 +266,7 @@ function ProofSummary() {
             <Link to="/proof" className="btn btn-dark">Open proof page</Link>
           </div>
         </div>
-        <div className="panel checks" aria-live="polite">
+        <div className="checks open-checks" aria-live="polite">
           {groups.map((g) => {
             const rows = checks.filter((c) => c.group === g);
             const failed = rows.filter((c) => !c.ok).length;
@@ -256,7 +293,7 @@ function Faq() {
     ["What if my host never confirms the bill as paid?", "An unpaid bill releases you seven days after its due date, and your payouts go straight to your wallet again."],
     ["What does it cost?", "The Bitcoin network fee, which you cap, plus the NEAR Intents swap spread on the host's share. Rigbill takes nothing."],
     ["Which pools work?", "Any pool that pays to a Bitcoin address. You paste your Rigbill address where your payout address goes."],
-    ["What is the smallest bill?", "NEAR Intents won't swap less than about 8,300 sats. The app shows the current dollar amount and warns hosts before they issue a smaller bill."],
+    ["What is the smallest bill?", "NEAR Intents has a minimum swap, a little over $6 of USDC when we last checked. The app prices every bill live and warns hosts before they issue one below it."],
     ["What if the swap is refunded?", "The BTC comes back to your payout address, the host locks a new quote, and the next split pays it."],
   ];
   return (
