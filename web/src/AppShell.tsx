@@ -25,7 +25,7 @@ export function AppShell({ active, children }: { active: Tab; children: (account
             <Link to="/proof" className={active === "proof" ? "on" : ""}>Proof</Link>
           </nav>
           <div className="app-who">
-            <span className={`chip ${network === "testnet" ? "chip-review" : "chip-lime"}`}>{network}</span>
+            <span className={`chip ${network === "testnet" ? "chip-review" : "chip-lime"}`}>{network === "mainnet" ? "NEAR mainnet" : network}</span>
             {account && <span className="mono">{account}</span>}
             {account && <button className="link-btn" onClick={() => void signOut().catch(() => {})}>Sign out</button>}
             {account === null && <button className="btn-light" onClick={connect}>Sign in with NEAR</button>}

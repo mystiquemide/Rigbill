@@ -17,7 +17,7 @@ Built at NEAR HACKATHON · #NEARHackathon · [@NEARProtocol](https://x.com/NEARP
 | Demo post | [x.com/MystiqueMide/status/2121614001477926978](https://x.com/MystiqueMide/status/2121614001477926978) |
 | Live app | [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz) (NEAR mainnet) |
 | Live proof | [rigbill.midelabs.xyz/proof](https://rigbill.midelabs.xyz/proof) |
-| Contract | [`v1.rigbill.near`](https://nearblocks.io/address/v1.rigbill.near) on mainnet, `v1.rigbill.testnet` on testnet |
+| Contract | [`v1.rigbill.near`](https://nearblocks.io/address/v1.rigbill.near) on NEAR mainnet |
 | Judging guide | [JUDGE.md](JUDGE.md): a 5 minute path through the product and the proof |
 | Tracks | Real-World Money (`realworld`), Open Innovation (`open`) |
 
@@ -249,31 +249,31 @@ The same build ran the loop first on NEAR testnet and Bitcoin testnet4 (`NETWORK
 
 ## Screens
 
-Every screen reads live state from the contract, Bitcoin and NEAR. Nothing is sample data. The proof and landing pages are on mainnet; the miner and host screens are from the testnet app, signed in as `rigbill.testnet` and `rigbill-host.testnet`.
+Every screen is the live app on NEAR mainnet, signed in as the real accounts from the mainnet run: `rigbill.near` as the miner and the host that issued bill #0. Nothing is sample data. Each one reads the contract, Bitcoin and NEAR live.
 
 ### Miner home
 
-![Miner home on testnet. Top left: the payout address tb1qmhw640… with Copy address, Show QR code and View on mempool.space. Top right: the confirmed balance. Middle: open bill #1, $10.00 for 2026-12 hosting from rigbill-host.testnet, due Dec 13 2026, ceiling 15,000 sats, locked quote 14,000 sats, with the line "Your next payout pays 14,000 sats to your host first. Everything above that goes to your wallet." Bottom: the bills list and the "Send everything to my wallet" panel.](docs/screens/miner-home.webp)
+![Miner home on NEAR mainnet, signed in as rigbill.near, with the pink NEAR mainnet badge in the nav. Your payout address bc1qha9neh96udkmnrudq70xc4rfzvnr6p60truyns with Copy address, Show QR code and View on mempool.space. Balance 0 sats, since the last payout was split. Bills: #1 $6.50 November 2026 Withdrawn, #0 $6.00 November 2026 Paid with split fcdf483e. No open bill, so every payout goes straight to the cold wallet. Settings: cold wallet bc1q9ljm5ccjnxlra49evsqrfxdw054w96hljsd4vv, fee cap 3,000 sats, payout key 03c83c5d…ac1f derived by v1.signer.](docs/screens/miner-home.webp)
 
-The miner's whole picture on one screen: the payout address to paste into the pool, what's waiting there, the open bill and exactly what the next payout will pay. The "Send everything to my wallet" panel lets the miner try to skip the bill and watch the contract refuse it on chain.
+The miner's whole picture on one screen: the payout address to paste into the pool, what's waiting there, every bill and its state, and the settings the contract enforces. While a bill is open, this screen shows exactly what the next payout will pay the host, and a "Send everything to my wallet" button that lets the miner try to skip the bill and watch the contract refuse it on chain.
 
 ### Miner controls: settings, approved relayers, release a split
 
-![Miner settings and controls on testnet. Settings: cold wallet tb1qa5zy…, fee cap 3,000 sats per payout, payout key 02504ac7…f1ca derived by v1.signer-prod.testnet. Approved relayers: an empty list with "None yet. Only you and your host can request a split", a field to add a NEAR account and Save relayers. Release an unused split: split number 0 looked up, status Signed, Bitcoin transaction 8549fc8d…, pays bill #0, with "This split paid bill #0, so it's on Bitcoin and can't be released."](docs/screens/miner-controls.webp)
+![Miner settings and controls on NEAR mainnet. Settings: cold wallet bc1q9ljm…, fee cap 3,000 sats per payout, payout key derived by v1.signer. Approved relayers: one approved account, 1991985a…dbc7c, with Remove, and a field to add a NEAR account. Release an unused split: split 0 looked up, status Signed, Bitcoin transaction fcdf483e77ce…, pays bill #0, with "This split paid bill #0, so it's on Bitcoin and can't be released."](docs/screens/miner-controls.webp)
 
-The miner sets their cold wallet and fee cap, approves up to three relayer accounts (such as the keeper agent) that may ask the contract for splits, and can release a split that was signed but never reached Bitcoin. The app checks the chain first and refuses to release a split that's already on Bitcoin.
+The miner sets their cold wallet and fee cap, approves up to three relayer accounts (such as the keeper agent) that may ask the contract for splits, and can release a split that was signed but never reached Bitcoin. The app checks the chain first and refuses to release a split that's already on Bitcoin, as it does here for the mainnet split that paid bill #0.
 
 ### Host: issue bills
 
-![Host screen on testnet. Left: the Issue a bill form with the miner's NEAR account, amount in USD, period, due date and the host's Base address for USDC, with the note "Locks 0.01 NEAR for storage. The bill does nothing until the miner accepts it." Right: Bills you issued, four bills: #4 $7.50 Withdrawn, #3 $6.00 Quote locked, #1 $10.00 Quote locked, #0 $10.00 Paid.](docs/screens/host-bills.webp)
+![Host screen on NEAR mainnet. Left: the Issue a bill form with the miner's NEAR account, amount in USD, period, due date and the host's Base address for USDC. Right: Bills you issued, two bills to rigbill.near: #1 $6.50 November 2026 Withdrawn, #0 $6.00 November 2026 Paid.](docs/screens/host-bills.webp)
 
 The host bills a miner in US dollars and names the Base address where USDC should land. Each bill shows its state and what it's waiting for next.
 
 ### Host: one bill, paid
 
-![Host view of bill #0 on testnet: $10.00 for 2026-11 hosting to rigbill.testnet, ceiling 15,000 sats, due Dec 12 2026, Paid. Left: 14,092 sats to the deposit, 35,578 sats to the miner, the Bitcoin split txid, "Contract signed split #0", "Bitcoin tx 8549fc8d… paid 14,092 sats to the deposit address, 397 confirmations". Right: the lifecycle, Issued, Accepted with ceiling 15,000 sats, Quote locked at 14,092 sats, Paying, Paid confirmed by you.](docs/screens/host-bill.webp)
+![Host view of mainnet bill #0: $6.00 for November 2026 to rigbill.near, ceiling 10,500 sats, Paid. Left: 9,113 sats to the 1Click deposit, 1,657 sats to the miner, Bitcoin split fcdf483e77ceb067b3c120f42c0b2a91a20194d61ed63329ca3c28837b25a397, "Contract signed split #0 (Signed)", "Bitcoin tx fcdf483e77ce… paid 9,113 sats to the deposit address", "USDC delivered · Basescan". Right: the lifecycle, Issued by you, Accepted by the miner with ceiling 10,500 sats, Quote locked at 9,113 sats, Paying from the miner's next payout, Paid, confirmed by you.](docs/screens/host-bill.webp)
 
-Every step of the bill, from issue to paid, with the Bitcoin transaction that paid it. On mainnet this screen also follows the 1Click swap and enables Confirm paid in one click once 1Click reports the USDC delivered, with the Basescan link.
+The real bill #0 from issue to paid: the Bitcoin split that paid it, the 1Click swap reported as delivered with the Basescan link, and the full lifecycle. Once 1Click reports the USDC delivered, Confirm paid is one click.
 
 ### Live proof
 
@@ -398,18 +398,20 @@ Relayer:
 cd relayer && npm install
 ```
 
+Everything runs on mainnet by default. Set `NETWORK=testnet` for testnet.
+
 ```bash
-NETWORK=testnet npm run relayer -- address <miner.testnet>
+npm run relayer -- address rigbill.near
 ```
 
 ```bash
-NETWORK=testnet npm run relayer -- split <miner.testnet> --dry-run
+npm run relayer -- split rigbill.near --dry-run
 ```
 
 `--dry-run` builds and prints the split without signing. It needs at least one confirmed payout at the miner's payout address.
 
 ```bash
-NETWORK=testnet npm run relayer -- status <miner.testnet>
+npm run relayer -- status rigbill.near
 ```
 
 `split` without `--dry-run` needs a funded NEAR account in `RELAYER_ACCOUNT_ID` and `RELAYER_PRIVATE_KEY` (see `.env.example`). The relayer has no special rights beyond being allowed to ask: the miner approves it with `set_relayers`, it can only submit splits the contract accepts, and it refuses to broadcast unless every MPC signature verifies against the payout key and the contract's sighashes match its own build.

@@ -258,7 +258,7 @@ dd { margin: 0; }
 .app-who { color: #ffffff; }
 .app-who .link-btn { color: #ffffffb3; }
 .app-who .link-btn:hover { color: #ffffff; }
-.app-who .chip-lime { background: transparent; border-color: #ffffff80; color: #ffffff; }
+.app-who .chip-lime { background: var(--lime); border-color: var(--lime); color: #000000; }
 .app-who .chip-review { background: transparent; color: #ffffff; border-color: #ffffff80; }
 .app-body { padding: 48px 0 96px; min-height: calc(100vh - 160px); }
 .app-foot { border-top: 1px solid var(--rule); padding: 24px 0; }
