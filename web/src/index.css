@@ -544,3 +544,5 @@ button.btn-light:hover { background: var(--mist); border-color: var(--mist); }
   .stage-addr { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .stage * { transition: none !important; } }
+.delivered { border: 1px solid var(--ink); border-left: 6px solid var(--lime); border-radius: var(--r-panel); padding: 20px; margin-top: 16px; }
+.field .row > button { white-space: nowrap; flex: none; }

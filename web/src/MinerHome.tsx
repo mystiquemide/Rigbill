@@ -5,10 +5,11 @@ import { getTipHeight, getUtxos, type Utxo } from "./esplora";
 import { fmtDate, fmtTime, fromNs, msg, sats, usd } from "./format";
 import { Link } from "./Link";
 import { MinerForm } from "./MinerSetup";
-import { getBillsForMiner, getOpenBill, getSplit, type Bill, type Miner, type Split } from "./near";
+import { getBill, getBillsForMiner, getOpenBill, getRelayers, getSplit, type Bill, type Miner, type Split } from "./near";
 import { SplitStatus } from "./SplitStatus";
 import { SweepButton } from "./SweepButton";
-import { ErrorBox, Skeleton, StatusTag } from "./ui";
+import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
+import { callContract } from "./wallet";
 
 type Payout = { pubkey: string; address: string };
 
@@ -38,6 +39,10 @@ export default function MinerHome({ account, miner, payout, onChanged }: { accou
         {open ? <SweepButton account={account} miner={miner} payoutAddress={payout.address} bill={open} /> : <NoBillNote />}
       </div>
       <Settings miner={miner} payout={payout} onChanged={onChanged} />
+      <div className="grid-mid">
+        <Relayers account={account} />
+        <ReleaseSplit account={account} onChanged={onChanged} />
+      </div>
     </div>
   );
 }
@@ -199,6 +204,154 @@ function Settings({ miner, payout, onChanged }: { miner: Miner; payout: Payout; 
           <div className="kv"><dt>Payout key</dt><dd className="num">{payout.pubkey.slice(0, 8)}&hellip;{payout.pubkey.slice(-4)}, derived by {SIGNER_ID}</dd></div>
         </dl>
       )}
+    </section>
+  );
+}
+
+const ACCOUNT_RE = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+const MAX_RELAYERS = 3;
+
+/** The miner approves up to three accounts that may ask the contract to sign splits for them. */
+function Relayers({ account }: { account: string }) {
+  const [saved, setSaved] = useState<string[] | null>(null);
+  const [list, setList] = useState<string[]>([]);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const load = useCallback(() => {
+    getRelayers(account).then((r) => { setSaved(r); setList(r); }).catch((e) => setError(e));
+  }, [account]);
+  useEffect(load, [load]);
+
+  const add = () => {
+    const a = draft.trim().toLowerCase();
+    if (!a || list.includes(a) || list.length >= MAX_RELAYERS || !ACCOUNT_RE.test(a) || a.length > 64) return;
+    setList([...list, a]);
+    setDraft("");
+  };
+  const draftBad = draft.trim() !== "" && (!ACCOUNT_RE.test(draft.trim().toLowerCase()) || draft.trim().length > 64);
+  const changed = saved !== null && (saved.length !== list.length || saved.some((r, i) => r !== list[i]));
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await callContract("set_relayers", { relayers: list }, 0n, 30n);
+      load();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel" aria-labelledby="relayers-title">
+      <p className="kicker" id="relayers-title">Approved relayers</p>
+      <p className="muted small" style={{ margin: "0 0 12px" }}>
+        Accounts that can ask the contract to split your payouts, besides you and your host. They can only request splits the contract already allows. Up to {MAX_RELAYERS}.
+      </p>
+      {saved === null && !error && <Skeleton label="Reading your approved relayers…" lines={2} />}
+      {saved !== null && (
+        <>
+          {list.length === 0 && <p className="note">None yet. Only you and your host can request a split.</p>}
+          <ul className="utxos">
+            {list.map((r) => (
+              <li key={r}>
+                <span className="mono">{r}</span>
+                <button className="link-btn" onClick={() => setList(list.filter((x) => x !== r))} aria-label={`Remove ${r}`}>Remove</button>
+              </li>
+            ))}
+          </ul>
+          {list.length < MAX_RELAYERS && (
+            <div className="field">
+              <label htmlFor="relayer-add">Add a NEAR account</label>
+              <div className="row" style={{ flexWrap: "nowrap" }}>
+                <input id="relayer-add" value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="relayer.near" aria-invalid={draftBad} spellCheck={false} />
+                <button className="btn-dark" onClick={add} disabled={!draft.trim() || draftBad}>Add</button>
+              </div>
+              {draftBad && <p className="help bad">That isn't a valid NEAR account name.</p>}
+            </div>
+          )}
+          <div className="form-actions" style={{ marginTop: 16 }}>
+            <button onClick={save} disabled={!changed || busy}>{busy ? "Waiting for your wallet\u2026" : "Save relayers"}</button>
+          </div>
+        </>
+      )}
+      {error != null && <ErrorNote error={error} />}
+    </section>
+  );
+}
+
+/** Frees the coins of a signed split that was never broadcast, so the payout can be split again. */
+function ReleaseSplit({ account, onChanged }: { account: string; onChanged: () => void }) {
+  const [id, setId] = useState("");
+  const [split, setSplit] = useState<Split | null | undefined>(undefined);
+  const [billPaid, setBillPaid] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [done, setDone] = useState(false);
+
+  const look = async () => {
+    setError(null);
+    setDone(false);
+    setSplit(undefined);
+    setBillPaid(false);
+    try {
+      const sp = await getSplit(id.trim());
+      if (sp?.bill_id) setBillPaid((await getBill(sp.bill_id))?.status === "Paid");
+      setSplit(sp);
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const release = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await callContract("release_split", { split_id: id.trim() }, 0n, 30n);
+      setDone(true);
+      setSplit(await getSplit(id.trim()));
+      onChanged();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const mine = split && split.miner === account;
+  const releasable = mine && split.status === "Signed" && !billPaid;
+
+  return (
+    <section className="panel" aria-labelledby="release-title">
+      <p className="kicker" id="release-title">Release an unused split</p>
+      <p className="muted small" style={{ margin: "0 0 12px" }}>
+        If a split was signed but never sent to Bitcoin, for example because it was built with a wrong amount, release it so those coins can be split again. Only do this for a split that isn't on Bitcoin.
+      </p>
+      <div className="field">
+        <label htmlFor="release-id">Split number</label>
+        <div className="row" style={{ flexWrap: "nowrap" }}>
+          <input id="release-id" inputMode="numeric" value={id} onChange={(e) => { setId(e.target.value.replace(/\D/g, "")); setSplit(undefined); setDone(false); }} placeholder="0" />
+          <button className="btn-dark" onClick={look} disabled={!id}>Look up</button>
+        </div>
+      </div>
+      {split === null && <p className="note">No split with that number.</p>}
+      {split && (
+        <dl className="kv-list" style={{ marginTop: 12 }}>
+          <div className="kv"><dt>Status</dt><dd>{split.status}</dd></div>
+          <div className="kv"><dt>Bitcoin transaction</dt><dd className="num"><a href={`${MEMPOOL_WEB}/tx/${split.txid}`} target="_blank" rel="noreferrer">{split.txid.slice(0, 12)}&hellip;</a></dd></div>
+          {split.bill_id && <div className="kv"><dt>Pays bill</dt><dd>#{split.bill_id}</dd></div>}
+        </dl>
+      )}
+      {split && !mine && <p className="note">This split belongs to another miner.</p>}
+      {split && mine && billPaid && <p className="note">This split paid bill #{split.bill_id}, so it's on Bitcoin and can't be released.</p>}
+      {split && mine && !billPaid && !releasable && !done && <p className="note">Only a signed split can be released. This one is {split.status.toLowerCase()}.</p>}
+      {done && <p className="note note-lime">Released. Those coins can be split again.</p>}
+      {releasable && !done && (
+        <div className="form-actions" style={{ marginTop: 16 }}>
+          <button className="btn-dark" onClick={release} disabled={busy}>{busy ? "Waiting for your wallet\u2026" : `Release split #${id}`}</button>
+        </div>
+      )}
+      {error != null && <ErrorNote error={error} />}
     </section>
   );
 }

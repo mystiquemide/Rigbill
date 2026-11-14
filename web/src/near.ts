@@ -51,9 +51,11 @@ export interface Split {
   miner: string;
   txid: string;
   outputs: { address: string; value: string }[];
-  status: "Requested" | "Signed" | "Failed";
+  status: "Requested" | "Signed" | "Failed" | "Released";
   bill_id: string | null;
 }
+
+export const getRelayers = (miner: string) => view<string[]>(CONTRACT_ID, "get_relayers", { miner });
 
 export const getSplit = (id: string) => view<Split | null>(CONTRACT_ID, "get_split", { split_id: id });
 

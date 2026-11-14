@@ -70,7 +70,7 @@ export type SwapStatus = "KNOWN_DEPOSIT_TX" | "PENDING_DEPOSIT" | "INCOMPLETE_DE
 
 export interface SwapStatusResponse {
   status: SwapStatus;
-  swapDetails?: { destinationChainTxHashes?: { hash: string; explorerUrl?: string }[] };
+  swapDetails?: { destinationChainTxHashes?: { hash: string; explorerUrl?: string }[]; amountOutFormatted?: string };
 }
 
 export async function swapStatus(depositAddress: string): Promise<SwapStatusResponse> {

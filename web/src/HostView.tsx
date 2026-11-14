@@ -5,7 +5,7 @@ import { fmtDate, fmtTime, fromNs, msg, sats, toNs, usd } from "./format";
 import { Lifecycle } from "./Lifecycle";
 import { Link } from "./Link";
 import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, refetchBillUntilChanged, type Bill, type Split } from "./near";
-import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, usdToSats, type Quote } from "./oneclick";
+import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, swapStatus, usdToSats, type Quote, type SwapStatusResponse } from "./oneclick";
 import { usePath } from "./routing";
 import { SplitStatus } from "./SplitStatus";
 import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
@@ -255,6 +255,9 @@ function PaymentPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }
   useEffect(() => { if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null)); }, [bill.split_id]);
   const [toHost, toMiner] = split?.outputs ?? [];
   const paying = bill.status === "Paying";
+  const swap = useSwapWatch(paying && network === "mainnet" ? bill.quote?.deposit_address : undefined);
+  const delivered = swap?.status === "SUCCESS";
+  const outTx = swap?.swapDetails?.destinationChainTxHashes?.[0]?.hash;
   return (
     <section className="panel">
       <h2 className="panel-title">{paying ? "The miner's payout was split" : "Paid"}</h2>
@@ -266,8 +269,19 @@ function PaymentPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }
         </dl>
       )}
       <div style={{ marginTop: 16 }}><SplitStatus bill={bill} /></div>
-      {paying && (
+      {paying && delivered && (
+        <div className="delivered" role="status">
+          <p className="kicker" style={{ margin: 0 }}>1Click delivered the USDC</p>
+          <p style={{ margin: "8px 0 16px" }}>
+            {swap?.swapDetails?.amountOutFormatted ?? usd(Number(bill.usd_cents))} USDC reached <span className="mono">{bill.host_address}</span> on Base.
+            {outTx && <> <a href={`https://basescan.org/tx/${outTx}`} target="_blank" rel="noreferrer">See it on Basescan</a></>}
+          </p>
+          <button onClick={act("confirm_paid")} disabled={!!busy}>{busy === "confirm_paid" ? "Waiting for your wallet…" : "Confirm paid"}</button>
+        </div>
+      )}
+      {paying && !delivered && (
         <>
+          {swap && <p className="note">1Click is still working on it ({swap.status.toLowerCase().replace(/_/g, " ")}). This updates on its own.</p>}
           <p className="note note-review">Check that {usd(Number(bill.usd_cents))} USDC reached <span className="mono">{bill.host_address}</span>, then confirm. If 1Click refunded the swap, report it and lock a new quote.</p>
           <div className="actions">
             <button onClick={act("confirm_paid")} disabled={!!busy}>{busy === "confirm_paid" ? "Waiting for your wallet…" : "Confirm paid"}</button>
@@ -369,4 +383,23 @@ function LockQuote({ bill, expired, onDone }: { bill: Bill; expired: boolean; on
       {error != null && <ErrorNote error={error} />}
     </section>
   );
+}
+
+/** Polls 1Click for the swap behind a paying bill until it settles, so the host can confirm in one click. */
+function useSwapWatch(depositAddress: string | undefined): SwapStatusResponse | null {
+  const [swap, setSwap] = useState<SwapStatusResponse | null>(null);
+  useEffect(() => {
+    if (!depositAddress) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      const st = await swapStatus(depositAddress).catch(() => null);
+      if (!alive) return;
+      if (st) setSwap(st);
+      if (!st || !["SUCCESS", "REFUNDED", "FAILED"].includes(st.status)) timer = setTimeout(tick, 20000);
+    };
+    tick();
+    return () => { alive = false; clearTimeout(timer); };
+  }, [depositAddress]);
+  return swap;
 }

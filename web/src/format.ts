@@ -24,6 +24,7 @@ const RULES: Record<string, string> = {
   OUTPUT_AMOUNT_MISMATCH: "The host's share has to match the locked quote exactly. Nothing was sent.",
   NOT_AUTHORIZED: "Only the miner, the bill's host or a relayer the miner approved can request a split.",
   BAD_SPLIT_STATE: "Only a signed split can be released.",
+  QUOTE_STILL_LIVE: "The bill's quote is still valid, so this payment may already be with 1Click. You can release it after the quote expires.",
   BILL_ALREADY_PAID: "That split paid a bill, so it can't be released.",
   TOO_MANY_RELAYERS: "A miner can approve at most three relayers.",
   OUTPOINT_ALREADY_SIGNED: "One of these coins was already signed for in another split. Nothing was sent.",
