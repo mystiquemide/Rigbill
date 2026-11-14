@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Skeleton } from "./ui";
 import { CONTRACT_ID, network } from "./config";
 import { runChecks, type Check } from "./proof";
@@ -19,12 +19,20 @@ export default function ProofPage() {
   const [error, setError] = useState("");
   const [ranAt, setRanAt] = useState<Date | null>(null);
 
+  // Each run has an id. A run that's been replaced, or outlived the page, writes nothing.
+  const runId = useRef(0);
   const start = useCallback(() => {
-    runChecks(setChecks)
-      .then(() => { setStatus("done"); setRanAt(new Date()); })
-      .catch((e) => { setStatus("error"); setError(e instanceof Error ? e.message : String(e)); });
+    const id = ++runId.current;
+    const live = () => id === runId.current;
+    runChecks((c) => live() && setChecks(c))
+      .then(() => { if (live()) { setStatus("done"); setRanAt(new Date()); } })
+      .catch((e) => { if (live()) { setStatus("error"); setError(e instanceof Error ? e.message : String(e)); } });
   }, []);
-  useEffect(start, [start]);
+  useEffect(() => {
+    start();
+    const counter = runId;
+    return () => { counter.current++; };
+  }, [start]);
   const run = () => {
     setChecks([]);
     setStatus("running");

@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { coldAddressError, payoutFromDerivedKey } from "./btc";
 import { BILL_STORAGE_DEPOSIT, MEMPOOL_WEB, network } from "./config";
 import { fmtDate, fmtTime, fromNs, msg, sats, toNs, usd } from "./format";
 import { Lifecycle } from "./Lifecycle";
 import { Link } from "./Link";
-import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, quoteLive, refetchBillUntilChanged, type Bill, type Split } from "./near";
+import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, quoteLive, refetchBillUntilChanged, type Bill } from "./near";
 import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, swapStatus, usdToSats, type Quote, type SwapStatusResponse } from "./oneclick";
 import { usePath } from "./routing";
 import { SplitStatus } from "./SplitStatus";
-import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
+import { ErrorBox, ErrorNote, Skeleton, StaleNote, StatusTag } from "./ui";
+import { useLoad, useNow } from "./useLoad";
 import { callContract } from "./wallet";
 
 const QUOTE_TTL_DAYS = 3;
@@ -23,21 +24,17 @@ export function HostView({ account }: { account: string }) {
 // ---------------------------------------------------------------- S6
 
 function HostHome({ account }: { account: string }) {
-  const [bills, setBills] = useState<Bill[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => {
-    getBillsForHost(account).then((b) => { setBills(b); setError(null); }).catch((e) => setError(msg(e)));
-  }, [account]);
-  useEffect(load, [load]);
+  const list = useLoad(`host-bills:${account}`, () => getBillsForHost(account));
+  const bills = list.data;
   // After issuing, wait until a lagging RPC node shows the new bill.
   const afterIssue = async () => {
     const before = bills?.length ?? 0;
     for (let i = 0; i < 8; i++) {
       const b = await getBillsForHost(account).catch(() => null);
-      if (b && b.length > before) return setBills(b);
+      if (b && b.length > before) return list.set(b);
       await new Promise((r) => setTimeout(r, 1250));
     }
-    load();
+    list.reload();
   };
 
   return (
@@ -46,8 +43,9 @@ function HostHome({ account }: { account: string }) {
       <IssueForm onDone={() => void afterIssue()} />
       <section className="panel host-bills" aria-labelledby="issued-title">
         <div className="row"><p className="kicker" id="issued-title">Bills you issued</p>{bills && <span className="muted small">{bills.length} {bills.length === 1 ? "bill" : "bills"}</span>}</div>
-        {error && <ErrorBox what="Couldn't read your bills" error={error} retry={load} />}
-        {!bills && !error && <Skeleton label="Reading your bills from the contract…" />}
+        {list.error && !bills && <ErrorBox what="Couldn't read your bills" error={list.error} retry={list.reload} />}
+        {list.error && bills && <StaleNote error={list.error} retry={list.reload} />}
+        {!bills && !list.error && <Skeleton label="Reading your bills from the contract…" />}
         {bills?.length === 0 && <p className="note">No bills yet. Issue your first one with the form. Nothing happens until the miner accepts it.</p>}
         {bills?.map((b) => <HostRow key={b.id} bill={b} />)}
       </section>
@@ -89,7 +87,7 @@ function IssueForm({ onDone }: { onDone: () => void }) {
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [now] = useState(() => Date.now());
+  const now = useNow();
   useEffect(() => { btcPriceUsd().then(setPrice).catch(() => setPrice(null)); }, []);
 
   const cents = Math.round(Number(amount) * 100);
@@ -157,25 +155,26 @@ function Field({ id, label, value, set, help, bad, warn, type = "text", mode }: 
 // ---------------------------------------------------------------- S7
 
 function HostBillDetail({ account, id }: { account: string; id: string }) {
-  const [bill, setBill] = useState<Bill | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => {
-    getBill(id).then((b) => { setBill(b); setError(null); }).catch((e) => setError(msg(e)));
-  }, [id]);
-  useEffect(load, [load]);
+  const load = useLoad(`host-bill:${id}`, () => getBill(id));
+  const bill = load.data;
 
   const back = <Link to="/host" className="back-link">Back to your bills</Link>;
-  if (error) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={error} retry={load} /></>;
+  if (load.error && bill === undefined) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={load.error} retry={load.reload} /></>;
   if (bill === undefined) return <>{back}<Skeleton label={`Reading bill #${id} from the contract…`} lines={4} /></>;
   if (bill === null || bill.host !== account) {
     return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: "16px 0 0" }}>There is no bill #{id} issued by {account}.</p></section></>;
   }
-  const afterTx = () => void refetchBillUntilChanged(id, bill.status).then((b) => setBill(b)).catch((e) => setError(msg(e)));
-  return <HostBill bill={bill} back={back} onChanged={afterTx} />;
+  const afterTx = () => void refetchBillUntilChanged(id, bill.status).then((b) => (b ? load.set(b) : load.reload())).catch(() => load.reload());
+  return (
+    <>
+      {load.error && <StaleNote error={load.error} retry={load.reload} />}
+      <HostBill bill={bill} back={back} onChanged={afterTx} />
+    </>
+  );
 }
 
 function HostBill({ bill, back, onChanged }: { bill: Bill; back: React.ReactNode; onChanged: () => void }) {
-  const [now] = useState(() => Date.now());
+  const now = useNow();
   const quoteExpired = !!bill.quote && !quoteLive(bill.quote, now);
   const needsQuote = bill.status === "Accepted" || (bill.status === "QuoteApproved" && quoteExpired);
   return (
@@ -251,8 +250,7 @@ function LockedPanel({ bill }: { bill: Bill }) {
 
 function PaymentPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }) {
   const { busy, error, act } = useAct(bill, onChanged);
-  const [split, setSplit] = useState<Split | null>(null);
-  useEffect(() => { if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null)); }, [bill.split_id]);
+  const split = useLoad(`split:${bill.split_id ?? "-"}`, () => (bill.split_id ? getSplit(bill.split_id) : Promise.resolve(null))).data ?? null;
   const [toHost, toMiner] = split?.outputs ?? [];
   // A bill that expired while a split was paying it can still be confirmed paid.
   const paying = bill.status === "Paying" || (bill.status === "Expired" && !!bill.split_id);

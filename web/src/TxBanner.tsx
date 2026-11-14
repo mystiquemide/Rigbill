@@ -42,11 +42,11 @@ export function TxBanner({ account }: { account: string }) {
   );
   return (
     <section className={`card banner ${banner.kind === "refused" || banner.kind === "error" ? "error" : ""}`} role="status">
-      {banner.kind === "checking" && <span>Checking the transaction result... {link}</span>}
+      {banner.kind === "checking" && <span>Checking the transaction result&hellip; {link}</span>}
       {banner.kind === "ok" && <span>Transaction confirmed. {link}</span>}
       {banner.kind === "refused" && (
         <span>
-          <strong>{banner.text}</strong> No signature was produced, so no Bitcoin transaction can follow. {link}
+          <strong>{banner.text}</strong> The contract refused it, so nothing changed. {link}
         </span>
       )}
       {banner.kind === "cancelled" && <span>You cancelled in the wallet. Nothing was sent.</span>}

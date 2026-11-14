@@ -1,38 +1,34 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { MEMPOOL_WEB } from "./config";
-import { fmtDate, fromNs, msg, sats, usd } from "./format";
+import { fmtDate, fromNs, sats, usd } from "./format";
 import { Lifecycle } from "./Lifecycle";
 import { Link } from "./Link";
-import { getBill, getOpenBill, getSplit, refetchBillUntilChanged, type Bill, type Split } from "./near";
+import { getBill, getOpenBill, getSplit, refetchBillUntilChanged, type Bill } from "./near";
 import { btcPriceUsd, usdToSats } from "./oneclick";
 import { SplitStatus } from "./SplitStatus";
-import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
+import { ErrorBox, ErrorNote, Skeleton, StaleNote, StatusTag } from "./ui";
+import { useLoad } from "./useLoad";
 import { callContract } from "./wallet";
 
 /** S5: one bill, from the miner's side. */
 export default function MinerBillDetail({ account, id }: { account: string; id: string }) {
-  const [bill, setBill] = useState<Bill | null | undefined>(undefined);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => {
-    Promise.all([getBill(id), getOpenBill(account)])
-      .then(([b, o]) => { setBill(b); setOpenId(o?.id ?? null); setError(null); })
-      .catch((e) => setError(msg(e)));
-  }, [id, account]);
-  useEffect(load, [load]);
+  const load = useLoad(`miner-bill:${account}:${id}`, () => Promise.all([getBill(id), getOpenBill(account)]));
+  const bill = load.data?.[0];
+  const openId = load.data?.[1]?.id ?? null;
 
   const back = <Link to="/miner" className="back-link">Back to your payouts</Link>;
-  if (error) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={error} retry={load} /></>;
+  if (load.error && !load.data) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={load.error} retry={load.reload} /></>;
   if (bill === undefined) return <>{back}<Skeleton label={`Reading bill #${id} from the contract…`} lines={4} /></>;
   if (bill === null || bill.miner !== account) {
     return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: 0 }}>There is no bill #{id} addressed to {account}.</p></section></>;
   }
 
   const other = openId && openId !== bill.id ? openId : null;
-  const afterTx = () => void refetchBillUntilChanged(id, bill.status).then(() => load()).catch((e) => setError(msg(e)));
+  const afterTx = () => void refetchBillUntilChanged(id, bill.status).finally(load.reload);
   return (
     <div className="bill-detail">
       {back}
+      {load.error && <StaleNote error={load.error} retry={load.reload} />}
       <header className="bill-head">
         <div>
           <p className="kicker">Bill #{bill.id}</p>
@@ -121,15 +117,14 @@ function AcceptPanel({ bill, onDone }: { bill: Bill; onDone: () => void }) {
 }
 
 function Receipt({ bill }: { bill: Bill }) {
-  const [split, setSplit] = useState<Split | null>(null);
-  useEffect(() => {
-    if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null));
-  }, [bill.split_id]);
+  const splitLoad = useLoad(`split:${bill.split_id ?? "-"}`, () => (bill.split_id ? getSplit(bill.split_id) : Promise.resolve(null)));
+  const split = splitLoad.data ?? null;
   const [host, cold] = split?.outputs ?? [];
   return (
     <section className="panel" aria-labelledby="receipt-title">
       <h2 className="panel-title" id="receipt-title">{bill.status === "Paid" ? "Paid from your payout" : "Paying from your payout"}</h2>
-      {!split && <Skeleton label="Reading the split from the contract…" lines={2} />}
+      {!split && !splitLoad.error && <Skeleton label="Reading the split from the contract…" lines={2} />}
+      {!split && splitLoad.error && <p className="note">Couldn't read the split right now. <button className="link-btn" onClick={splitLoad.reload}>Try again</button></p>}
       {split && (
         <dl className="kv-list">
           {host && <div className="kv"><dt>To your host</dt><dd className="num">{sats(Number(host.value))}</dd></div>}

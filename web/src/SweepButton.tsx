@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { SPLIT_STORAGE_DEPOSIT } from "./config";
 import { getUtxos, type Utxo } from "./esplora";
 import { sats } from "./format";
 import type { Bill, Miner } from "./near";
-import { ErrorNote } from "./ui";
+import { ErrorNote, Skeleton } from "./ui";
+import { useLoad } from "./useLoad";
 import { callContract } from "./wallet";
 
 const MAX_INPUTS = 4;
@@ -16,15 +17,11 @@ const feeFor = (inputs: number) => Math.ceil(10.5 + 68 * inputs + 43) * 2;
  * real contract with real UTXOs, and the refusal comes back from the chain.
  */
 export function SweepButton({ account, miner, payoutAddress, bill }: { account: string; miner: Miner; payoutAddress: string; bill: Bill }) {
-  const [utxos, setUtxos] = useState<Utxo[]>([]);
+  const read = useLoad(`sweep:${payoutAddress}`, () => getUtxos(payoutAddress).then((u) => u.filter((x) => x.status.confirmed).slice(0, MAX_INPUTS)));
+  const utxos: Utxo[] = read.data ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
-  useEffect(() => {
-    getUtxos(payoutAddress)
-      .then((u) => setUtxos(u.filter((x) => x.status.confirmed).slice(0, MAX_INPUTS)))
-      .catch(() => setUtxos([]));
-  }, [account, payoutAddress]);
 
   const total = utxos.reduce((a, u) => a + u.value, 0);
   const coldValue = total - feeFor(utxos.length);
@@ -57,7 +54,11 @@ export function SweepButton({ account, miner, payoutAddress, bill }: { account: 
         Bill #{bill.id} is open, so the contract only signs payouts that pay it first. Try sending everything to your
         wallet and the contract refuses on chain.
       </p>
-      {utxos.length === 0 ? (
+      {read.data === undefined && !read.error ? (
+        <Skeleton label="Reading the payout address on Bitcoin…" lines={1} />
+      ) : read.data === undefined ? (
+        <p className="note">Couldn't read the payout address right now. <button className="link-btn" onClick={read.reload}>Try again</button></p>
+      ) : utxos.length === 0 ? (
         <p className="note">Nothing confirmed at the payout address to send yet.</p>
       ) : coldValue < 546 ? (
         <p className="note">The confirmed balance is too small to cover a network fee.</p>

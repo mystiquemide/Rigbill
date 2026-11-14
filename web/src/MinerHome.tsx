@@ -1,29 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { COINBASE_MATURITY, MEMPOOL_WEB, SIGNER_ID } from "./config";
-import { getTipHeight, getUtxos, type Utxo } from "./esplora";
-import { fmtDate, fmtTime, fromNs, msg, sats, usd } from "./format";
+import { getTipHeight, getUtxos } from "./esplora";
+import { fmtDate, fmtTime, fromNs, sats, usd } from "./format";
 import { Link } from "./Link";
 import { MinerForm } from "./MinerSetup";
 import { getBill, getBillsForMiner, getOpenBill, getRelayers, getSplit, quoteLive, type Bill, type Miner, type Split } from "./near";
 import { SplitStatus } from "./SplitStatus";
 import { SweepButton } from "./SweepButton";
-import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
+import { ErrorBox, ErrorNote, Skeleton, StaleNote, StatusTag } from "./ui";
+import { useLoad, useNow } from "./useLoad";
 import { callContract } from "./wallet";
 
 type Payout = { pubkey: string; address: string };
 
 /** S4: everything a registered miner needs, read live from the contract and Bitcoin. */
 export default function MinerHome({ account, miner, payout, onChanged }: { account: string; miner: Miner; payout: Payout; onChanged: () => void }) {
-  const [bills, setBills] = useState<Bill[] | null>(null);
-  const [open, setOpen] = useState<Bill | null>(null);
-  const [billsError, setBillsError] = useState<string | null>(null);
-  const loadBills = useCallback(() => {
-    Promise.all([getBillsForMiner(account), getOpenBill(account)])
-      .then(([b, o]) => { setBills(b); setOpen(o); setBillsError(null); })
-      .catch((e) => setBillsError(msg(e)));
-  }, [account]);
-  useEffect(loadBills, [loadBills]);
+  const billsLoad = useLoad(`miner-bills:${account}`, () => Promise.all([getBillsForMiner(account), getOpenBill(account)]));
+  const bills = billsLoad.data?.[0] ?? null;
+  const open = billsLoad.data?.[1] ?? null;
+  // Anything that changes the contract (settings, relayers, a release) refreshes the bills too.
+  const changed = () => { onChanged(); billsLoad.reload(); };
 
   return (
     <div className="miner-home">
@@ -32,16 +29,17 @@ export default function MinerHome({ account, miner, payout, onChanged }: { accou
         <PayoutCard address={payout.address} pending={!miner.payout_pubkey} />
         <BalancePanel address={payout.address} />
       </div>
-      {billsError && <ErrorBox what="Couldn't read your bills" error={billsError} retry={loadBills} />}
+      {billsLoad.error && !billsLoad.data && <ErrorBox what="Couldn't read your bills" error={billsLoad.error} retry={billsLoad.reload} />}
+      {billsLoad.error && billsLoad.data && <StaleNote error={billsLoad.error} retry={billsLoad.reload} />}
       {open && <OpenBill bill={open} />}
       <div className="grid-mid">
         <History bills={bills} account={account} />
         {open ? <SweepButton account={account} miner={miner} payoutAddress={payout.address} bill={open} /> : <NoBillNote />}
       </div>
-      <Settings miner={miner} payout={payout} onChanged={onChanged} />
+      <Settings miner={miner} payout={payout} onChanged={changed} />
       <div className="grid-mid">
         <Relayers account={account} />
-        <ReleaseSplit account={account} onChanged={onChanged} />
+        <ReleaseSplit account={account} onChanged={changed} />
       </div>
     </div>
   );
@@ -76,22 +74,19 @@ function PayoutCard({ address, pending }: { address: string; pending: boolean })
 }
 
 function BalancePanel({ address }: { address: string }) {
-  const [data, setData] = useState<{ utxos: Utxo[]; tip: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => {
-    Promise.all([getUtxos(address), getTipHeight()])
-      .then(([utxos, tip]) => { setData({ utxos, tip }); setError(null); })
-      .catch((e) => setError(msg(e)));
-  }, [address]);
-  useEffect(load, [load]);
+  const bal = useLoad(`balance:${address}`, () => Promise.all([getUtxos(address), getTipHeight()]).then(([utxos, tip]) => ({ utxos, tip })));
+  const data = bal.data;
+  const error = bal.error;
+  const load = bal.reload;
 
   const confirmed = data?.utxos.filter((u) => u.status.confirmed).reduce((a, u) => a + u.value, 0) ?? 0;
   const waiting = data?.utxos.filter((u) => !u.status.confirmed).reduce((a, u) => a + u.value, 0) ?? 0;
   return (
     <section className="panel balance" aria-labelledby="balance-title" aria-live="polite">
-      <div className="row"><p className="kicker" id="balance-title">Balance</p>{data && <button className="link-btn" onClick={load}>Refresh balance</button>}</div>
+      <div className="row"><p className="kicker" id="balance-title">Balance</p>{data && <button className="link-btn" onClick={load} disabled={bal.pending}>{bal.pending ? "Refreshing…" : "Refresh balance"}</button>}</div>
       {!data && !error && <Skeleton label="Reading the payout address on Bitcoin…" lines={2} />}
-      {error && <><p className="note note-warn">Couldn't reach Bitcoin data right now. Your funds are fine.</p><button className="ghost" onClick={load}>Try again</button></>}
+      {error && !data && <><p className="note note-warn">Couldn't reach Bitcoin data right now. Your funds are fine.</p><button className="btn-dark" onClick={load}>Try again</button></>}
+      {error && data && <StaleNote error={error} retry={load} />}
       {data && (
         <>
           <p className="big-num">{sats(confirmed)}</p>
@@ -118,7 +113,7 @@ function BalancePanel({ address }: { address: string }) {
 
 function OpenBill({ bill }: { bill: Bill }) {
   const q = bill.quote;
-  const [now] = useState(() => Date.now());
+  const now = useNow();
   const quoteIsLive = quoteLive(q, now);
   return (
     <section className="panel open-bill" aria-labelledby="open-title">
@@ -156,10 +151,7 @@ function History({ bills, account }: { bills: Bill[] | null; account: string }) 
 }
 
 function HistoryRow({ bill, canAccept }: { bill: Bill; canAccept: boolean }) {
-  const [split, setSplit] = useState<Split | null>(null);
-  useEffect(() => {
-    if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null));
-  }, [bill.split_id]);
+  const split = useLoad(`split:${bill.split_id ?? "-"}`, () => (bill.split_id ? getSplit(bill.split_id) : Promise.resolve(null))).data ?? null;
   const extra =
     bill.status === "Issued" ? <span className={canAccept ? "lime small" : "muted small"}>{canAccept ? "Review and accept" : "Waits for your open bill"}</span>
       : bill.status === "Paid" && split ? <span className="mono">split {split.txid.slice(0, 8)}&hellip;</span>

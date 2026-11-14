@@ -57,7 +57,9 @@ function Hero() {
   const [paid, setPaid] = useState<PaidBill | null | undefined>(proofFile ? undefined : null);
   useEffect(() => {
     if (!proofFile) return;
-    latestPaidBill(proofFile.miner).then(setPaid).catch(() => setPaid(null));
+    let alive = true;
+    latestPaidBill(proofFile.miner).then((d) => alive && setPaid(d)).catch(() => alive && setPaid(null));
+    return () => { alive = false; };
   }, []);
   return (
     <section className="hero" aria-labelledby="hero-title">
@@ -121,9 +123,11 @@ function LiveBill() {
   const [state, setState] = useState<{ s: "loading" } | { s: "error" } | { s: "none" } | { s: "ok"; d: PaidBill }>(proofFile ? { s: "loading" } : { s: "none" });
   useEffect(() => {
     if (!proofFile) return;
+    let alive = true;
     latestPaidBill(proofFile.miner)
-      .then((d) => setState(d ? { s: "ok", d } : { s: "none" }))
-      .catch(() => setState({ s: "error" }));
+      .then((d) => alive && setState(d ? { s: "ok", d } : { s: "none" }))
+      .catch(() => alive && setState({ s: "error" }));
+    return () => { alive = false; };
   }, []);
 
   if (state.s !== "ok") {
@@ -250,7 +254,9 @@ function ProofSummary() {
   const [checks, setChecks] = useState<Check[]>([]);
   const [status, setStatus] = useState<"running" | "done" | "error">("running");
   useEffect(() => {
-    runChecks(setChecks).then(() => setStatus("done")).catch(() => setStatus("error"));
+    let alive = true;
+    runChecks((c) => alive && setChecks(c)).then(() => alive && setStatus("done")).catch(() => alive && setStatus("error"));
+    return () => { alive = false; };
   }, []);
   const groups = ["Contract", "Payout address", "Bills", "Refusals", "1Click"] as const;
   const summary: Record<(typeof groups)[number], string> = {

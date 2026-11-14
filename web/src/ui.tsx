@@ -36,6 +36,16 @@ export function ErrorBox({ what, error, message, retry }: { what: string; error?
   );
 }
 
+/** A refresh failed but earlier data is still on screen: say so, and offer a retry. */
+export function StaleNote({ error, retry }: { error: string; retry: () => void }) {
+  return (
+    <p className="note" role="status">
+      <span>Couldn't refresh just now, so this shows what was last read. <button className="link-btn" onClick={retry}>Try again</button></span>
+      <span className="sr-only">{error}</span>
+    </p>
+  );
+}
+
 /** Loading placeholder: grey lines where content will appear, with the same words for screen readers. */
 export function Skeleton({ label, lines = 3 }: { label: string; lines?: number }) {
   return (
