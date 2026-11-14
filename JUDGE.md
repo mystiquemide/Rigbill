@@ -10,6 +10,7 @@ Mining hosts bill their clients in dollars, but the miners earn Bitcoin. Rigbill
 |---|---|
 | Tracks | Real-World Money (`realworld`), Open Innovation (`open`) |
 | Demo video | [youtu.be/uXWAdQzu4Tc](https://youtu.be/uXWAdQzu4Tc) (2 minutes) |
+| Demo post | [on X](https://x.com/MystiqueMide/status/2121614001477926978) |
 | Live app | [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz) |
 | Contract | [`v1.rigbill.near`](https://nearblocks.io/address/v1.rigbill.near) |
 | Built | 2026-11-12 to 2026-11-14, all code in the hackathon window |

@@ -14,6 +14,7 @@ Built at NEAR HACKATHON · #NEARHackathon · [@NEARProtocol](https://x.com/NEARP
 | | |
 |---|---|
 | Demo video | [youtu.be/uXWAdQzu4Tc](https://youtu.be/uXWAdQzu4Tc) (2 minutes) |
+| Demo post | [x.com/MystiqueMide/status/2121614001477926978](https://x.com/MystiqueMide/status/2121614001477926978) |
 | Live app | [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz) (NEAR mainnet) |
 | Live proof | [rigbill.midelabs.xyz/proof](https://rigbill.midelabs.xyz/proof) |
 | Contract | [`v1.rigbill.near`](https://nearblocks.io/address/v1.rigbill.near) on mainnet, `v1.rigbill.testnet` on testnet |
@@ -472,7 +473,7 @@ Rigbill is built by [MystiqueMide](https://github.com/mystiquemide), a solo buil
 
 - Live app: [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz)
 - Demo video: [youtu.be/uXWAdQzu4Tc](https://youtu.be/uXWAdQzu4Tc)
-- Demo post: on X with #NEARHackathon, tagging [@NEARProtocol](https://x.com/NEARProtocol)
+- Demo post: [on X](https://x.com/MystiqueMide/status/2121614001477926978), #NEARHackathon
 - Contact: open an issue on this repository
 
 ## Hackathon disclosures
