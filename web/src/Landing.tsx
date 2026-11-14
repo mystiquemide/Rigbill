@@ -60,22 +60,25 @@ function Hero() {
   }, []);
   return (
     <section className="hero" aria-labelledby="hero-title">
-      <div className="wrap hero-inner">
-        <Link to="/proof" className="news-pill">
-          <span className="news-tag">Live</span>
-          {proofFile ? `Running on NEAR ${proofFile.network} and Bitcoin` : "Read the proof"}
-          <span aria-hidden="true" className="news-arrow">&rarr;</span>
-        </Link>
-        <h1 id="hero-title" className="h1 hero-title">Your payout pays the bill first</h1>
-        <p className="hero-sub">
-          A Bitcoin payout address that pays your hosting bill in USDC, then sends everything else to your own wallet.
-          No one holds its key.
-        </p>
-        <div className="cta-row hero-ctas">
-          <Link to="/miner" className="btn btn-cta">Open the app</Link>
-          <Link to="/proof" className="btn btn-dark">See the proof</Link>
+      <div className="wrap hero-split">
+        <div className="hero-copy">
+          <Link to="/proof" className="news-pill">
+            <span className="news-tag">Live</span>
+            {proofFile ? `Running on NEAR ${proofFile.network} and Bitcoin` : "Read the proof"}
+            <span aria-hidden="true" className="news-arrow">&rarr;</span>
+          </Link>
+          <h1 id="hero-title" className="h1 hero-title">Your payout pays the bill first</h1>
+          <p className="hero-sub">
+            A Bitcoin payout address that pays your hosting bill in USDC, then sends everything else to your own
+            wallet. No one holds its key.
+          </p>
+          <div className="cta-row hero-ctas">
+            <Link to="/miner" className="btn btn-cta">Open the app</Link>
+            <Link to="/proof" className="btn btn-dark">See the proof</Link>
+          </div>
+          <p className="hero-note">Signing in needs a NEAR wallet, such as Meteor or Intear. The proof needs nothing.</p>
         </div>
-        <p className="hero-note">Signing in needs a NEAR wallet, such as Meteor or Intear. The proof needs nothing.</p>
+        <div className="hero-bill"><LiveBill /></div>
       </div>
       <div className="wrap">
         <ul className="trust" aria-label="On chain right now">
@@ -101,7 +104,6 @@ function Hero() {
             </div>
           </li>
         </ul>
-        <div className="hero-bill"><LiveBill /></div>
       </div>
     </section>
   );
@@ -109,7 +111,7 @@ function Hero() {
 
 function Icon({ d }: { d: string }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
   );
 }
 
@@ -125,7 +127,7 @@ function LiveBill() {
 
   if (state.s !== "ok") {
     return (
-      <aside className="panel" aria-live="polite">
+      <aside className="panel receipt" aria-live="polite">
         <div className="panel-head"><span className="panel-label">Latest paid bill</span></div>
         {state.s === "loading" && <Skeleton label="Reading the latest paid bill from the contract and Bitcoin…" lines={5} />}
         <p className="skeleton">
@@ -139,7 +141,7 @@ function LiveBill() {
   const { bill, split, txid, confirmedHeight, fee } = state.d;
   const [host, cold] = split.outputs;
   return (
-    <aside className="panel" aria-label={`Bill ${bill.id}, paid`}>
+    <aside className="panel receipt" aria-label={`Bill ${bill.id}, paid`}>
       <div className="panel-head">
         <span className="panel-label">Bill #{bill.id} &middot; paid from a payout</span>
         <span className="chip chip-lime">Paid</span>
