@@ -87,10 +87,10 @@ Every screen reads live state from the contract, Bitcoin and NEAR. Nothing is sa
 | Route | Who | What |
 |---|---|---|
 | `/` | Anyone | What Rigbill does, with the latest paid bill and the refusals read live |
-| `/miner` | Miner | Set up a payout address, see the open bill, accept bills, try a sweep and watch it get refused |
+| `/miner` | Miner | Set up a payout address, see the open bill, accept bills, try a sweep and watch it get refused, approve up to three relayers, release a signed split that never reached Bitcoin |
 | `/miner/bills/:id` | Miner | Accept a bill with a ceiling, follow it to paid |
 | `/host` | Host | Issue bills, see what each one needs next |
-| `/host/bills/:id` | Host | Lock a live 1Click quote, confirm paid or report a refund |
+| `/host/bills/:id` | Host | Lock a live 1Click quote, watch the swap, confirm paid in one click once 1Click reports the USDC delivered (with the Basescan link), or report a refund |
 | `/proof` | Anyone | The `npm run verify` checks, run in the browser |
 
 Sign in with any NEAR wallet through NEAR Connect, such as Meteor, Intear or Nightly.
@@ -133,7 +133,7 @@ NETWORK=testnet npm run relayer -- split <miner.testnet> --dry-run
 NETWORK=testnet npm run relayer -- status <miner.testnet>
 ```
 
-`split` without `--dry-run` needs a funded NEAR account in `RELAYER_ACCOUNT_ID` and `RELAYER_PRIVATE_KEY` (see `.env.example`). The relayer has no special rights beyond being allowed to ask: the miner approves it with `set_relayers`, it can only submit splits the contract accepts, and it refuses to broadcast unless every MPC signature verifies against the payout key and the contract's sighashes match its own build.
+`split` without `--dry-run` needs a funded NEAR account in `RELAYER_ACCOUNT_ID` and `RELAYER_PRIVATE_KEY` (see `.env.example`). The relayer has no special rights beyond being allowed to ask: the miner approves it with `set_relayers` (in the app under Approved relayers), it can only submit splits the contract accepts, and it refuses to broadcast unless every MPC signature verifies against the payout key and the contract's sighashes match its own build.
 
 Contract (Rust, near-sdk 5):
 
@@ -170,7 +170,7 @@ Runs 80 contract tests (split rules, who may request a split, per-miner outpoint
 ## Known limits
 
 - The bill is marked paid when the host confirms it. That's safe in one direction: confirming is the host giving up its own claim, so it can't take anything from the miner. A host that never confirms only blocks the miner until the bill expires. Verifying the Base USDC transfer through `v1.signer`'s foreign-chain verification would remove that wait and isn't built yet.
-- Input values come from the caller. The contract can't read Bitcoin, so it signs over the values it's given, and a wrong value produces a signature no node will accept. That's why only the miner, the open bill's host or a relayer the miner approved may ask for a split, and why the miner can `release_split` a signed split that was never broadcast.
+- Input values come from the caller. The contract can't read Bitcoin, so it signs over the values it's given, and a wrong value produces a signature no node will accept. That's why only the miner, the open bill's host or a relayer the miner approved may ask for a split, and why the miner can `release_split` a signed split that was never broadcast (in the app under Release an unused split). Release is refused while the bill's quote is still live.
 - The contract only tracks payouts it signed. It can't stop a transaction signed elsewhere, but the payout address has no other key, so there is nothing else to sign with.
 - A miner can still point their pool at a different address off-chain. Hosts usually control the rigs and can watch each rig's payout address.
 - An unpaid bill expires 7 days after its due date, which releases the miner. A due date can be at most 90 days out.
