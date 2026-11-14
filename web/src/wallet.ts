@@ -1,5 +1,6 @@
 import { NearConnector } from "@hot-labs/near-connect";
-import { CONTRACT_ID, NEAR_RPC, network } from "./config";
+import { CONTRACT_ID, network } from "./config";
+import { NEAR_RPCS } from "./net";
 
 /**
  * NEAR Connect (HOT, Meteor, Intear, NEAR Mobile, OKX and others). It replaced
@@ -11,7 +12,7 @@ let connector: NearConnector | null = null;
 export function getConnector(): NearConnector {
   connector ??= new NearConnector({
     network,
-    providers: { [network]: [NEAR_RPC] },
+    providers: { [network]: NEAR_RPCS },
     footerBranding: null,
   });
   return connector;

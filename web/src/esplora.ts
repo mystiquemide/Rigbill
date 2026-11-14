@@ -1,4 +1,5 @@
 import { ESPLORA } from "./config";
+import { esplora } from "./net";
 
 export interface Utxo {
   txid: string;
@@ -8,7 +9,7 @@ export interface Utxo {
 }
 
 async function get(path: string): Promise<Response> {
-  const res = await fetch(ESPLORA + path, { signal: AbortSignal.timeout(15000) });
+  const res = await esplora(path);
   if (!res.ok) throw new Error(`Esplora ${res.status}`);
   return res;
 }
@@ -17,7 +18,7 @@ export const getUtxos = async (address: string): Promise<Utxo[]> => (await get(`
 export const getTipHeight = async (): Promise<number> => Number(await (await get("/blocks/tip/height")).text());
 
 export async function getTxStatus(txid: string): Promise<{ inMempool: boolean; confirmed: boolean; block_height?: number }> {
-  const res = await fetch(`${ESPLORA}/tx/${txid}/status`, { signal: AbortSignal.timeout(15000) });
+  const res = await esplora(`/tx/${txid}/status`);
   if (res.status === 404) return { inMempool: false, confirmed: false };
   if (!res.ok) throw new Error(`Esplora ${res.status}`);
   const st = await res.json();

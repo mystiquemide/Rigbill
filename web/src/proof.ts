@@ -1,7 +1,8 @@
 import proofTestnet from "../../proof/testnet.json";
 import proofMainnet from "../../proof/mainnet.json";
 import { payoutFromDerivedKey } from "./btc";
-import { CONTRACT_ID, ESPLORA, MEMPOOL_WEB, NEARBLOCKS_WEB, NEAR_RPC, SIGNER_ID, network } from "./config";
+import { CONTRACT_ID, MEMPOOL_WEB, NEARBLOCKS_WEB, SIGNER_ID, network } from "./config";
+import { esplora, nearRpc } from "./net";
 import { getMiner, view, type Bill, type Split } from "./near";
 import { mainnetQuoteCheck, swapStatus } from "./oneclick";
 
@@ -39,20 +40,14 @@ export interface PaidBill {
 }
 
 async function rpc(method: string, params: unknown): Promise<any> {
-  const res = await fetch(NEAR_RPC, {
-    signal: AbortSignal.timeout(15000),
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: "proof", method, params }),
-  });
-  const body = await res.json();
+  const body = await nearRpc(method, params);
   if (body.error) throw new Error(body.error?.cause?.name ?? "NEAR RPC error");
   return body.result;
 }
 
 async function btcTx(txid: string): Promise<any | null> {
-  const res = await fetch(`${ESPLORA}/tx/${txid}`, { signal: AbortSignal.timeout(15000) });
-  return res.ok ? res.json() : null;
+  const res = await esplora(`/tx/${txid}`).catch(() => null);
+  return res?.ok ? res.json() : null;
 }
 
 export async function latestPaidBill(miner: string): Promise<PaidBill | null> {
@@ -93,32 +88,40 @@ export async function runChecks(onProgress?: (done: Check[]) => void): Promise<C
   refusalTxs.forEach((t) => t.catch(() => {}));
   const quote = mainnetQuoteCheck(payout.pubkey).catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }));
 
-  const bills = await view<Bill[]>(CONTRACT_ID, "get_bills_for_miner", { miner, limit: 20 });
-  for (const b of [...bills].reverse().filter((x) => x.split_id)) {
-    const split = await view<Split | null>(CONTRACT_ID, "get_split", { split_id: b.split_id });
-    if (!split) continue;
-    const tx = await btcTx(split.txid);
-    const href = `${MEMPOOL_WEB}/tx/${split.txid}`;
-    push({ group: "Bills", label: `Split #${b.split_id} signed by the MPC network`, detail: split.status, ok: split.status === "Signed" });
-    const spendsPayout = !!tx && tx.vin.every((i: any) => i.prevout?.scriptpubkey_address === payout.address);
-    push({ group: "Bills", label: "Every input spends the payout address", detail: `${split.txid.slice(0, 8)}…`, ok: spendsPayout, href });
-    const onChain = tx ? tx.vout.map((o: any) => `${o.scriptpubkey_address}:${o.value}`).join(",") : "";
-    const signed = split.outputs.map((o) => `${o.address}:${o.value}`).join(",");
-    push({ group: "Bills", label: "Outputs on chain are exactly what the contract signed", detail: split.outputs.map((o) => Number(o.value).toLocaleString("en-US")).join(" + ") + " sats", ok: onChain === signed, href });
-    if (b.quote) {
-      const first = split.outputs[0];
-      push({ group: "Bills", label: "First output is the approved quote", detail: `${Number(b.quote.amount_in_sats).toLocaleString("en-US")} sats`, ok: first?.address === b.quote.deposit_address && first?.value === b.quote.amount_in_sats });
+  try {
+    const bills = await view<Bill[]>(CONTRACT_ID, "get_bills_for_miner", { miner, limit: 20 });
+    for (const b of [...bills].reverse().filter((x) => x.split_id)) {
+      const split = await view<Split | null>(CONTRACT_ID, "get_split", { split_id: b.split_id });
+      if (!split) continue;
+      const tx = await btcTx(split.txid);
+      const href = `${MEMPOOL_WEB}/tx/${split.txid}`;
+      push({ group: "Bills", label: `Split #${b.split_id} signed by the MPC network`, detail: split.status, ok: split.status === "Signed" });
+      const spendsPayout = !!tx && tx.vin.every((i: any) => i.prevout?.scriptpubkey_address === payout.address);
+      push({ group: "Bills", label: "Every input spends the payout address", detail: `${split.txid.slice(0, 8)}…`, ok: spendsPayout, href });
+      const onChain = tx ? tx.vout.map((o: any) => `${o.scriptpubkey_address}:${o.value}`).join(",") : "";
+      const signed = split.outputs.map((o) => `${o.address}:${o.value}`).join(",");
+      push({ group: "Bills", label: "Outputs on chain are exactly what the contract signed", detail: split.outputs.map((o) => Number(o.value).toLocaleString("en-US")).join(" + ") + " sats", ok: onChain === signed, href });
+      if (b.quote) {
+        const first = split.outputs[0];
+        push({ group: "Bills", label: "First output is the approved quote", detail: `${Number(b.quote.amount_in_sats).toLocaleString("en-US")} sats`, ok: first?.address === b.quote.deposit_address && first?.value === b.quote.amount_in_sats });
+      }
+      if (network === "mainnet" && b.quote && b.status === "Paid") {
+        const st = await swapStatus(b.quote.deposit_address).catch(() => null);
+        const out = st?.swapDetails?.destinationChainTxHashes?.[0]?.hash;
+        push({ group: "Bills", label: "1Click swapped it and delivered USDC on Base", detail: st?.status ?? "unreachable", ok: st?.status === "SUCCESS", href: out ? `https://basescan.org/tx/${out}` : undefined });
+      }
+      push({ group: "Bills", label: "Confirmed on Bitcoin", detail: tx?.status?.confirmed ? `block ${tx.status.block_height.toLocaleString("en-US")}` : "in mempool", ok: !!tx?.status?.confirmed, href });
     }
-    if (network === "mainnet" && b.quote && b.status === "Paid") {
-      const st = await swapStatus(b.quote.deposit_address).catch(() => null);
-      const out = st?.swapDetails?.destinationChainTxHashes?.[0]?.hash;
-      push({ group: "Bills", label: "1Click swapped it and delivered USDC on Base", detail: st?.status ?? "unreachable", ok: st?.status === "SUCCESS", href: out ? `https://basescan.org/tx/${out}` : undefined });
-    }
-    push({ group: "Bills", label: "Confirmed on Bitcoin", detail: tx?.status?.confirmed ? `block ${tx.status.block_height.toLocaleString("en-US")}` : "in mempool", ok: !!tx?.status?.confirmed, href });
+  } catch (e) {
+    push({ group: "Bills", label: "Read the bills and their Bitcoin transactions", detail: `couldn't reach the network: ${e instanceof Error ? e.message : e}`, ok: false });
   }
 
   for (const [i, r] of proofFile.refusals.entries()) {
-    const res = await refusalTxs[i];
+    const res = await refusalTxs[i].catch(() => null);
+    if (!res) {
+      push({ group: "Refusals", label: r.attempt, detail: "couldn't reach NEAR, try again", ok: false, href: `${NEARBLOCKS_WEB}/txns/${r.tx}` });
+      continue;
+    }
     const outcomes = [res.transaction_outcome, ...res.receipts_outcome];
     const failure = JSON.stringify(outcomes.map((o: any) => o.outcome.status?.Failure).find(Boolean) ?? "");
     const reachedSigner = res.receipts_outcome.some((o: any) => o.outcome.executor_id === SIGNER_ID);

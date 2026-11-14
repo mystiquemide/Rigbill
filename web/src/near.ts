@@ -1,4 +1,5 @@
-import { CONTRACT_ID, NEAR_RPC, SIGNER_ID } from "./config";
+import { CONTRACT_ID, SIGNER_ID } from "./config";
+import { nearRpc } from "./net";
 
 export interface Miner {
   cold_address: string;
@@ -8,25 +9,13 @@ export interface Miner {
 
 /** Read-only contract call through public RPC. No wallet needed. */
 export async function view<T>(contractId: string, method: string, args: Record<string, unknown>): Promise<T> {
-  const res = await fetch(NEAR_RPC, {
-    signal: AbortSignal.timeout(15000),
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: "rigbill",
-      method: "query",
-      params: {
-        request_type: "call_function",
-        finality: "final",
-        account_id: contractId,
-        method_name: method,
-        args_base64: btoa(JSON.stringify(args)),
-      },
-    }),
+  const body = await nearRpc("query", {
+    request_type: "call_function",
+    finality: "final",
+    account_id: contractId,
+    method_name: method,
+    args_base64: btoa(JSON.stringify(args)),
   });
-  if (!res.ok) throw new Error(`NEAR RPC ${res.status}`);
-  const body = await res.json();
   if (body.error) throw new Error(body.error?.cause?.name ?? body.error?.message ?? "NEAR RPC error");
   if (body.result?.error) throw new Error(body.result.error);
   return JSON.parse(new TextDecoder().decode(new Uint8Array(body.result.result)));
@@ -78,13 +67,7 @@ export interface TxResult {
 
 /** Final status of a NEAR transaction, read from RPC rather than trusted from the wallet. */
 export async function txResult(hash: string, sender: string): Promise<TxResult> {
-  const res = await fetch(NEAR_RPC, {
-    signal: AbortSignal.timeout(15000),
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: "rigbill", method: "tx", params: { tx_hash: hash, sender_account_id: sender, wait_until: "FINAL" } }),
-  });
-  const body = await res.json();
+  const body = await nearRpc("tx", { tx_hash: hash, sender_account_id: sender, wait_until: "FINAL" });
   if (body.error) throw new Error(body.error?.cause?.name ?? "NEAR RPC error");
   const outcomes = [body.result.transaction_outcome, ...body.result.receipts_outcome];
   for (const o of outcomes) {
