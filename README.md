@@ -111,6 +111,29 @@ Sign in with any NEAR wallet through NEAR Connect, such as Meteor, Intear or Nig
 
 Everything here was written from 2026-11-12. The whole loop has run on mainnet: MPC signing, the bill lifecycle, a real BTC to USDC swap through 1Click and every refusal. `npm run verify` and CI check both mainnet and testnet on each commit, along with a live 1Click quote to show the route is still open.
 
+## Use it from an agent
+
+An AI agent can run either side of Rigbill without being trusted. The contract decides what can be signed, so a buggy or compromised agent can fail to act but can't move money anywhere the rules don't allow.
+
+**As the miner's relayer.** The miner approves the agent's NEAR account under Approved relayers in the app (`set_relayers`). The agent then watches the payout address and, when a payout confirms, runs:
+
+```bash
+npm run relayer -- split <miner.near>
+```
+
+That builds the split, asks the contract for MPC signatures (`sign_split`), checks every signature against the payout key, broadcasts to Bitcoin and hands the deposit to 1Click. The contract only signs a split that pays the open bill first and sends the rest to the miner's own wallet.
+
+**As the host's billing agent.** The agent signs in with the host's account and calls the contract directly:
+
+| Step | Method | Limit the contract enforces |
+|---|---|---|
+| Bill a miner in USD | `issue_bill` | Due date in the next 90 days, 0.01 NEAR storage deposit |
+| Lock a live 1Click quote | `approve_quote` | Never above the miner's sats ceiling, deadline in the future |
+| Mark the bill paid once 1Click reports `SUCCESS` | `confirm_paid` | Host only |
+| Report a refunded swap | `report_refund` | Host only, the bill goes back to accepted |
+
+`confirm_paid` is still the host's word, whether a person or an agent sends it. See Known limits.
+
 ## Run it
 
 Web app (mainnet by default, `VITE_NETWORK=testnet` for testnet):
