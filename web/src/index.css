@@ -268,7 +268,7 @@ dd { margin: 0; }
 .signin p.muted { margin: 0 0 24px; }
 .note { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .note::before { content: ""; width: 2px; align-self: stretch; min-height: 20px; background: currentColor; flex: none; }
-.note-lime { color: var(--lime); }
+.note-lime { color: var(--pink-text); }
 .note-review { color: var(--review); }
 .note-warn { color: var(--warn); }
 .note-lost { color: var(--lost); }

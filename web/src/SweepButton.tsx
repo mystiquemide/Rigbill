@@ -58,7 +58,7 @@ export function SweepButton({ account, miner, payoutAddress, bill }: { account: 
         wallet and the contract refuses on chain.
       </p>
       {utxos.length === 0 ? (
-        <p className="note">Nothing confirmed at the payout address to sweep yet.</p>
+        <p className="note">Nothing confirmed at the payout address to send yet.</p>
       ) : coldValue < 546 ? (
         <p className="note">The confirmed balance is too small to cover a network fee.</p>
       ) : (

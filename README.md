@@ -10,7 +10,7 @@ Mining hosts run other people's rigs and bill them every month in dollars. The m
 
 It runs on mainnet with real money. The miner tried to [send everything to cold while a bill was open](https://nearblocks.io/txns/2cTep6qoRqYoLKb6uoSaPFfi1jsRzUvUfuvyrsomn9Ch) and the contract failed with `BILL_OPEN_HOST_OUTPUT_REQUIRED` before asking the MPC network for a signature. The payout then [paid the bill and sent the rest to cold](https://mempool.space/tx/fcdf483e77ceb067b3c120f42c0b2a91a20194d61ed63329ca3c28837b25a397), and 1Click [delivered the USDC on Base](https://basescan.org/tx/0x2c3e7251d5178d0b83006457e06694e1ecf80176e072dcbb80cd931f1950b1c6).
 
-![Rigbill landing page with a live paid bill read from the contract](docs/screens/landing.webp)
+![Rigbill landing page: the hero replays the latest paid bill, read live from mainnet](docs/screens/landing.webp)
 
 ![Architecture](docs/diagram.svg)
 
@@ -76,7 +76,7 @@ Every screen reads live state from the contract, Bitcoin and NEAR. Nothing is sa
 
 | Miner home | Host bill | Live proof |
 |---|---|---|
-| ![Miner home: payout address, open bill, history](docs/screens/miner-home.webp) | ![Host bill detail: paid split and lifecycle](docs/screens/host-bill.webp) | ![Proof page: every check passing](docs/screens/proof.webp) |
+| ![Miner home on testnet: payout address, open bill, history](docs/screens/miner-home.webp) | ![Host bill on testnet: paid split and lifecycle](docs/screens/host-bill.webp) | ![Proof page on mainnet: every check passing](docs/screens/proof.webp) |
 
 | Route | Who | What |
 |---|---|---|
