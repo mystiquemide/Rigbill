@@ -1,5 +1,11 @@
 # Rigbill
 
+**Built on [NEAR](https://near.org).** [NEAR Chain Signatures](https://docs.near.org/chain-abstraction/chain-signatures) holds the only key to the Bitcoin payout address, a NEAR contract decides what it may sign, and [NEAR Intents](https://intents.near.org) 1Click pays the host in USDC on Base. Live on NEAR mainnet.
+
+[![Built on NEAR](https://img.shields.io/badge/Built%20on-NEAR-000000)](https://near.org)
+[![Chain Signatures](https://img.shields.io/badge/NEAR-Chain%20Signatures-000000)](https://docs.near.org/chain-abstraction/chain-signatures)
+[![NEAR Intents](https://img.shields.io/badge/NEAR-Intents%201Click-000000)](https://intents.near.org)
+[![Contract on mainnet](https://img.shields.io/badge/mainnet-v1.rigbill.near-c4006a)](https://nearblocks.io/address/v1.rigbill.near)
 [![CI](https://github.com/mystiquemide/Rigbill/actions/workflows/ci.yml/badge.svg)](https://github.com/mystiquemide/Rigbill/actions/workflows/ci.yml)
 
 **Live app:** [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz) · **Live proof:** [rigbill.midelabs.xyz/proof](https://rigbill.midelabs.xyz/proof)
