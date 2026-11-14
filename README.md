@@ -182,7 +182,7 @@ cd contract && cargo test
 ./build.sh
 ```
 
-`build.sh` compiles to wasm and shrinks it with Binaryen's `wasm-opt` into `contract/out/rigbill.wasm`. With the pinned toolchain in `rust-toolchain.toml`, the result's base58 SHA-256 is `ATLpRT53noanqnsoRoyop8wRnzayrt1NHFZG3iPGbAXV`, the code hash deployed on both `v1.rigbill.near` and `v1.rigbill.testnet`. `npm run verify` prints the live hash.
+`build.sh` compiles to wasm and shrinks it with Binaryen's `wasm-opt` into `contract/out/rigbill.wasm`. With the pinned toolchain in `rust-toolchain.toml`, the result's base58 SHA-256 is `HJy7CpJ6pjGPfthmnTdiFqe42AgyFtgUCiNmnVWxwNkK`, the code hash deployed on both `v1.rigbill.near` and `v1.rigbill.testnet`. `npm run verify` prints the live hash.
 
 ## Tests
 
