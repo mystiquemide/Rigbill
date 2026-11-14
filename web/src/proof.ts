@@ -34,6 +34,8 @@ export interface PaidBill {
   txid: string;
   confirmedHeight: number | null;
   fee: number | null;
+  /** The payout address, derived from the MPC key the contract stored. */
+  address: string;
 }
 
 async function rpc(method: string, params: unknown): Promise<any> {
@@ -59,8 +61,11 @@ export async function latestPaidBill(miner: string): Promise<PaidBill | null> {
   if (!bill) return null;
   const split = await view<Split | null>(CONTRACT_ID, "get_split", { split_id: bill.split_id });
   if (!split) return null;
-  const tx = await btcTx(split.txid);
-  return { bill, split, txid: split.txid, confirmedHeight: tx?.status?.confirmed ? tx.status.block_height : null, fee: tx?.fee ?? null };
+  const [tx, derived] = await Promise.all([
+    btcTx(split.txid),
+    view<string>(SIGNER_ID, "derived_public_key", { path: `miner/${miner}`, predecessor: CONTRACT_ID, domain_id: 0 }),
+  ]);
+  return { bill, split, txid: split.txid, confirmedHeight: tx?.status?.confirmed ? tx.status.block_height : null, fee: tx?.fee ?? null, address: payoutFromDerivedKey(derived).address };
 }
 
 export async function runChecks(onProgress?: (done: Check[]) => void): Promise<Check[]> {

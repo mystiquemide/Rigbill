@@ -5,6 +5,7 @@ import { Link } from "./Link";
 import { SiteNav } from "./SiteNav";
 import { Logo } from "./Brand";
 import { Skeleton } from "./ui";
+import { PayoutStage } from "./PayoutStage";
 
 const sats = (v: string | number) => `${Number(v).toLocaleString("en-US")} sats`;
 const usd = (cents: string) => `$${(Number(cents) / 100).toFixed(2)}`;
@@ -78,7 +79,7 @@ function Hero() {
           </div>
           <p className="hero-note">Signing in needs a NEAR wallet, such as Meteor or Intear. The proof needs nothing.</p>
         </div>
-        <div className="hero-bill"><LiveBill /></div>
+        <div className="hero-bill">{paid ? <PayoutStage paid={paid} /> : <LiveBill />}</div>
       </div>
       <div className="wrap">
         <ul className="trust" aria-label="On chain right now">
