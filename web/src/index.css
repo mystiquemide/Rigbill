@@ -428,3 +428,6 @@ section[id] { scroll-margin-top: 88px; }
 .result-tick { width: 26px; height: 26px; border-radius: 999px; background: var(--lime); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
 button.btn-dark { background: var(--ink); color: #ffffff; border-color: var(--ink); }
 button.btn-dark:hover { background: var(--dark-hover); border-color: var(--dark-hover); }
+button.btn-light { background: #ffffff; color: var(--ink); border-color: #ffffff; }
+button.btn-light:hover { background: var(--mist); border-color: var(--mist); }
+.signin .h2 { font-size: clamp(32px, 3.6vw, 48px); }
