@@ -39,16 +39,35 @@ const bad = (label: string, detail = "") => {
 };
 const check = (cond: boolean, label: string, detail = "") => (cond ? ok(label, detail) : bad(label, detail));
 
+/** NEAR RPC with fallbacks. Old transactions age out of regular nodes after a few days, so an archival node comes last. */
+const RPC_URLS = [
+  NEAR_RPC_URL,
+  ...(network === "testnet"
+    ? ["https://test.rpc.fastnear.com", "https://archival-rpc.testnet.near.org"]
+    : ["https://rpc.mainnet.near.org", "https://archival-rpc.mainnet.near.org"]),
+].filter((u, i, all) => all.indexOf(u) === i);
+
 async function rpc(method: string, params: unknown): Promise<any> {
-  const res = await fetch(NEAR_RPC_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: "verify", method, params }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  const body = await res.json();
-  if (body.error) throw new Error(JSON.stringify(body.error.cause ?? body.error));
-  return body.result;
+  let last: unknown;
+  for (const url of RPC_URLS) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: "verify", method, params }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const body = await res.json();
+      if (body.error) {
+        last = new Error(JSON.stringify(body.error.cause ?? body.error));
+        continue;
+      }
+      return body.result;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
 }
 
 async function esplora(path: string): Promise<any> {
