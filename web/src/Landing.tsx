@@ -201,8 +201,10 @@ function How() {
   return (
     <section id="how" className="block" aria-labelledby="how-title">
       <div className="wrap">
-        <p className="kicker">How it works</p>
-        <h2 id="how-title" className="h2" style={{ marginBottom: 40 }}>One rule, enforced by the contract</h2>
+        <div className="center-head">
+          <p className="kicker">How it works</p>
+          <h2 id="how-title" className="h2">One rule, enforced by the contract</h2>
+        </div>
         <ol className="how">
           {steps.map(([t, d], i) => (
             <li key={t}><span className="n">0{i + 1}</span><h3>{t}</h3><p>{d}</p></li>
@@ -261,7 +263,7 @@ function ProofSummary() {
             <p className="kicker">Check it yourself</p>
             <h2 id="proof-title" className="h2">Don't trust us, read the chain</h2>
           </div>
-          <div style={{ maxWidth: 460 }}>
+          <div style={{ maxWidth: 620 }}>
             <p className="muted" style={{ margin: "0 0 20px" }}>These checks run in your browser right now against the contract, Bitcoin and NEAR. They are the same checks as npm run verify in the repo.</p>
             <Link to="/proof" className="btn btn-dark">Open proof page</Link>
           </div>
@@ -299,8 +301,10 @@ function Faq() {
   return (
     <section className="block" aria-labelledby="faq-title">
       <div className="wrap">
-        <p className="kicker">Questions</p>
-        <h2 id="faq-title" className="h2" style={{ marginBottom: 40 }}>Asked by miners and hosts first</h2>
+        <div className="center-head">
+          <p className="kicker">Questions</p>
+          <h2 id="faq-title" className="h2">Asked by miners and hosts first</h2>
+        </div>
         <div className="faq">
           {qa.map(([q, a], i) => (
             <details key={q} open={i === 0}><summary>{q}</summary><p>{a}</p></details>
