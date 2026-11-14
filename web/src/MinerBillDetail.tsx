@@ -6,7 +6,7 @@ import { Link } from "./Link";
 import { getBill, getOpenBill, getSplit, refetchBillUntilChanged, type Bill, type Split } from "./near";
 import { btcPriceUsd, usdToSats } from "./oneclick";
 import { SplitStatus } from "./SplitStatus";
-import { ErrorBox, ErrorNote, StatusTag } from "./ui";
+import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
 import { callContract } from "./wallet";
 
 /** S5: one bill, from the miner's side. */
@@ -23,7 +23,7 @@ export default function MinerBillDetail({ account, id }: { account: string; id: 
 
   const back = <Link to="/miner" className="back-link">Back to your payouts</Link>;
   if (error) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={error} retry={load} /></>;
-  if (bill === undefined) return <>{back}<p className="skeleton">Reading bill #{id} from the contract&hellip;</p></>;
+  if (bill === undefined) return <>{back}<Skeleton label={`Reading bill #${id} from the contract…`} lines={4} /></>;
   if (bill === null || bill.miner !== account) {
     return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: 0 }}>There is no bill #{id} addressed to {account}.</p></section></>;
   }
@@ -129,7 +129,7 @@ function Receipt({ bill }: { bill: Bill }) {
   return (
     <section className="panel" aria-labelledby="receipt-title">
       <h2 className="panel-title" id="receipt-title">{bill.status === "Paid" ? "Paid from your payout" : "Paying from your payout"}</h2>
-      {!split && <p className="skeleton">Reading the split from the contract&hellip;</p>}
+      {!split && <Skeleton label="Reading the split from the contract…" lines={2} />}
       {split && (
         <dl className="kv-list">
           {host && <div className="kv"><dt>To your host</dt><dd className="num">{sats(Number(host.value))}</dd></div>}

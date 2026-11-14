@@ -52,7 +52,7 @@ export function SweepButton({ account, miner, payoutAddress, bill }: { account: 
 
   return (
     <section className="panel sweep" aria-labelledby="sweep-title">
-      <p className="kicker" id="sweep-title">Sweep everything to cold</p>
+      <p className="kicker" id="sweep-title">Send everything to my wallet</p>
       <p className="muted" style={{ margin: "16px 0 0", fontSize: 15 }}>
         Bill #{bill.id} is open, so the contract only signs payouts that pay it first. Try sending everything to your
         wallet and the contract refuses on chain.
@@ -64,7 +64,7 @@ export function SweepButton({ account, miner, payoutAddress, bill }: { account: 
       ) : (
         <div className="actions">
           <button className="ghost" onClick={sweep} disabled={busy}>
-            {busy ? "Waiting for your wallet\u2026" : `Sweep ${sats(coldValue)} to cold`}
+            {busy ? "Waiting for your wallet\u2026" : `Send ${sats(coldValue)} to my cold wallet`}
           </button>
         </div>
       )}

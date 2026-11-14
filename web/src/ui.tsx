@@ -1,11 +1,11 @@
 import { NEARBLOCKS_WEB } from "./config";
-import { explain } from "./format";
+import { errorCode, explain } from "./format";
 import type { BillStatus } from "./near";
 import { ContractRefusal } from "./wallet";
 
 const LABELS: Record<BillStatus, string> = {
   Issued: "Waiting for miner",
-  Accepted: "Accepted, needs quote",
+  Accepted: "Needs a quote",
   QuoteApproved: "Quote locked",
   Paying: "Paying",
   Paid: "Paid",
@@ -17,21 +17,44 @@ export function StatusTag({ status }: { status: BillStatus }) {
   return <span className={`tag tag-${status.toLowerCase()}`}>{LABELS[status]}</span>;
 }
 
-export function ErrorBox({ what, error, retry }: { what: string; error: string; retry?: () => void }) {
+const NETWORK_HINT = "Couldn't reach the network right now. Your funds aren't affected. Check your connection and try again.";
+
+/** A failed read. Plain words first; the raw error stays behind Details for support. */
+export function ErrorBox({ what, error, message, retry }: { what: string; error?: string; message?: string; retry?: () => void }) {
   return (
-    <section className="card error">
+    <section className="card error" role="alert">
       <strong>{what}</strong>
-      <p className="mono small">{error}</p>
-      {retry && <button className="ghost" onClick={retry}>Try again</button>}
+      <p>{message ?? NETWORK_HINT}</p>
+      {error && (
+        <details className="error-details">
+          <summary>Details</summary>
+          <p className="mono small">{error}</p>
+        </details>
+      )}
+      {retry && <button className="btn-dark" onClick={retry}>Try again</button>}
     </section>
+  );
+}
+
+/** Loading placeholder: grey lines where content will appear, with the same words for screen readers. */
+export function Skeleton({ label, lines = 3 }: { label: string; lines?: number }) {
+  return (
+    <div className="skel" role="status" aria-live="polite">
+      <span className="sr-only">{label}</span>
+      {Array.from({ length: lines }, (_, i) => (
+        <span key={i} className="skel-line" aria-hidden="true" style={{ width: `${[92, 76, 58, 84][i % 4]}%` }} />
+      ))}
+      <span className="skel-label" aria-hidden="true">{label}</span>
+    </div>
   );
 }
 
 /** A failed action: the rule it hit, plus a nearblocks link when the contract refused on chain. */
 export function ErrorNote({ error }: { error: unknown }) {
   return (
-    <p className="err">
+    <p className="err" role="alert">
       {explain(error)}
+      {errorCode(error) && <span className="err-code"> {errorCode(error)}</span>}
       {error instanceof ContractRefusal && error.hash && (
         <>
           {" "}

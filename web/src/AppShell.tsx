@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Skeleton } from "./ui";
 import { CONTRACT_ID, NEARBLOCKS_WEB, network } from "./config";
 import { Logo } from "./Brand";
 import { Link } from "./Link";
@@ -27,13 +28,13 @@ export function AppShell({ active, children }: { active: Tab; children: (account
             <span className={`chip ${network === "testnet" ? "chip-review" : "chip-lime"}`}>{network}</span>
             {account && <span className="mono">{account}</span>}
             {account && <button className="link-btn" onClick={() => void signOut().catch(() => {})}>Sign out</button>}
-            {account === null && <button className="btn-light" onClick={connect}>Connect wallet</button>}
+            {account === null && <button className="btn-light" onClick={connect}>Sign in with NEAR</button>}
           </div>
         </div>
       </header>
       <main id="main" className="app-body">
         <div className="wrap">
-          {account === undefined && <p className="skeleton">Checking for a connected wallet&hellip;</p>}
+          {account === undefined && <Skeleton label="Checking for a connected wallet…" lines={2} />}
           {account === null && <SignInPrompt active={active} onConnect={connect} />}
           {account && <TxBanner account={account} />}
           {account && children(account)}
@@ -57,8 +58,8 @@ function SignInPrompt({ active, onConnect }: { active: Tab; onConnect: () => voi
       <h1 className="h2">{host ? <>Bill your miners in dollars, get USDC on Base</> : <>Set up your payout address and keep your own keys</>}</h1>
       <p className="muted">
         {host
-          ? "Sign in with your NEAR wallet to issue bills, lock quotes and confirm payments."
-          : "Sign in with your NEAR wallet. It only signs the actions you click, and Rigbill never holds your Bitcoin."}
+          ? "Sign in with your NEAR wallet to issue bills, lock quotes and confirm payments. Meteor, Intear or any NEAR wallet works."
+          : "Sign in with your NEAR wallet. It only signs the actions you click, and Rigbill never holds your Bitcoin. Meteor, Intear or any NEAR wallet works."}
       </p>
       <button onClick={onConnect}>Sign in with NEAR</button>
     </section>

@@ -4,6 +4,7 @@ import { latestPaidBill, proofFile, runChecks, type Check, type PaidBill } from 
 import { Link } from "./Link";
 import { SiteNav } from "./SiteNav";
 import { Logo } from "./Brand";
+import { Skeleton } from "./ui";
 
 const sats = (v: string | number) => `${Number(v).toLocaleString("en-US")} sats`;
 const usd = (cents: string) => `$${(Number(cents) / 100).toFixed(2)}`;
@@ -126,8 +127,8 @@ function LiveBill() {
     return (
       <aside className="panel" aria-live="polite">
         <div className="panel-head"><span className="panel-label">Latest paid bill</span></div>
+        {state.s === "loading" && <Skeleton label="Reading the latest paid bill from the contract and Bitcoin…" lines={5} />}
         <p className="skeleton">
-          {state.s === "loading" && "Reading the latest paid bill from the contract and Bitcoin…"}
           {state.s === "error" && "Couldn't reach NEAR or Bitcoin right now. The proof page has every record."}
           {state.s === "none" && "No paid bill on this network yet. The first one appears here as soon as it settles."}
         </p>

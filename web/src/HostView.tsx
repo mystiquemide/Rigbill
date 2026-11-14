@@ -8,7 +8,7 @@ import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, refetch
 import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, usdToSats, type Quote } from "./oneclick";
 import { usePath } from "./routing";
 import { SplitStatus } from "./SplitStatus";
-import { ErrorBox, ErrorNote, StatusTag } from "./ui";
+import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
 import { callContract } from "./wallet";
 
 const QUOTE_TTL_DAYS = 3;
@@ -47,8 +47,8 @@ function HostHome({ account }: { account: string }) {
       <section className="panel host-bills" aria-labelledby="issued-title">
         <div className="row"><p className="kicker" id="issued-title">Bills you issued</p>{bills && <span className="muted small">{bills.length} {bills.length === 1 ? "bill" : "bills"}</span>}</div>
         {error && <ErrorBox what="Couldn't read your bills" error={error} retry={load} />}
-        {!bills && !error && <p className="skeleton">Reading your bills from the contract&hellip;</p>}
-        {bills?.length === 0 && <p className="note">None yet. Issue one with the form. It waits until the miner accepts it.</p>}
+        {!bills && !error && <Skeleton label="Reading your bills from the contract…" />}
+        {bills?.length === 0 && <p className="note">No bills yet. Issue your first one with the form. Nothing happens until the miner accepts it.</p>}
         {bills?.map((b) => <HostRow key={b.id} bill={b} />)}
       </section>
     </div>
@@ -166,7 +166,7 @@ function HostBillDetail({ account, id }: { account: string; id: string }) {
 
   const back = <Link to="/host" className="back-link">Back to your bills</Link>;
   if (error) return <>{back}<ErrorBox what={`Couldn't read bill #${id}`} error={error} retry={load} /></>;
-  if (bill === undefined) return <>{back}<p className="skeleton">Reading bill #{id} from the contract&hellip;</p></>;
+  if (bill === undefined) return <>{back}<Skeleton label={`Reading bill #${id} from the contract…`} lines={4} /></>;
   if (bill === null || bill.host !== account) {
     return <>{back}<section className="panel"><p className="kicker">Bill #{id}</p><p className="muted" style={{ margin: "16px 0 0" }}>There is no bill #{id} issued by {account}.</p></section></>;
   }

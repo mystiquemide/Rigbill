@@ -8,7 +8,7 @@ import { MinerForm } from "./MinerSetup";
 import { getBillsForMiner, getOpenBill, getSplit, type Bill, type Miner, type Split } from "./near";
 import { SplitStatus } from "./SplitStatus";
 import { SweepButton } from "./SweepButton";
-import { ErrorBox, StatusTag } from "./ui";
+import { ErrorBox, Skeleton, StatusTag } from "./ui";
 
 type Payout = { pubkey: string; address: string };
 
@@ -84,8 +84,8 @@ function BalancePanel({ address }: { address: string }) {
   const waiting = data?.utxos.filter((u) => !u.status.confirmed).reduce((a, u) => a + u.value, 0) ?? 0;
   return (
     <section className="panel balance" aria-labelledby="balance-title" aria-live="polite">
-      <div className="row"><p className="kicker" id="balance-title">Balance</p>{data && <button className="link-btn" onClick={load}>Refresh</button>}</div>
-      {!data && !error && <p className="skeleton">Reading the payout address on Bitcoin&hellip;</p>}
+      <div className="row"><p className="kicker" id="balance-title">Balance</p>{data && <button className="link-btn" onClick={load}>Refresh balance</button>}</div>
+      {!data && !error && <Skeleton label="Reading the payout address on Bitcoin…" lines={2} />}
       {error && <><p className="note note-warn">Couldn't reach Bitcoin data right now. Your funds are fine.</p><button className="ghost" onClick={load}>Try again</button></>}
       {data && (
         <>
@@ -143,7 +143,7 @@ function History({ bills, account }: { bills: Bill[] | null; account: string }) 
   return (
     <section className="panel history" aria-labelledby="history-title">
       <div className="row"><p className="kicker" id="history-title">Bills</p>{bills && <span className="muted small">{bills.length} {bills.length === 1 ? "bill" : "bills"}</span>}</div>
-      {!bills && <p className="skeleton">Reading your bills from the contract&hellip;</p>}
+      {!bills && <Skeleton label="Reading your bills from the contract…" />}
       {bills?.length === 0 && <p className="note">No bills yet. When your host bills <span className="mono">{account}</span>, it shows up here with what it will cost.</p>}
       {bills?.map((b) => <HistoryRow key={b.id} bill={b} canAccept={!hasOpen} />)}
     </section>
@@ -159,8 +159,8 @@ function HistoryRow({ bill, canAccept }: { bill: Bill; canAccept: boolean }) {
     bill.status === "Issued" ? <span className={canAccept ? "lime small" : "muted small"}>{canAccept ? "Review and accept" : "Waits for your open bill"}</span>
       : bill.status === "Paid" && split ? <span className="mono">split {split.txid.slice(0, 8)}&hellip;</span>
       : bill.status === "QuoteApproved" ? <span className="muted small">Waiting for a payout</span>
-      : bill.status === "Accepted" ? <span className="muted small">Waiting for a quote</span>
-      : bill.status === "Paying" ? <span className="muted small">Paying now</span>
+      : bill.status === "Accepted" ? <span className="muted small">Waiting for your host's quote</span>
+      : bill.status === "Paying" ? <span className="muted small">Paying from this payout</span>
       : null;
   return (
     <Link to={`/miner/bills/${bill.id}`} className="hist-row" aria-label={`Bill ${bill.id}, ${usd(Number(bill.usd_cents))}, ${bill.status}`}>

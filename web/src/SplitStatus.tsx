@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Skeleton } from "./ui";
 import { CONTRACT_ID, MEMPOOL_WEB, NEARBLOCKS_WEB, network } from "./config";
 import { getTipHeight, getTxStatus } from "./esplora";
 import { msg, sats } from "./format";
@@ -56,7 +57,7 @@ export function SplitStatus({ bill }: { bill: Bill }) {
   const load = () => fetchState().then(setS);
 
   if (!bill.split_id) return null;
-  if (!s) return <div className="small muted">Loading payment status...</div>;
+  if (!s) return <Skeleton label="Reading the payment status…" lines={2} />;
   const { split, btc, swap, errors } = s;
   const dest = swap?.swapDetails?.destinationChainTxHashes?.[0];
   const hostOut = split?.outputs[0];
@@ -82,7 +83,7 @@ export function SplitStatus({ bill }: { bill: Bill }) {
       )}
       {network === "mainnet" ? (
         <div>
-          <span className={swap?.status === "SUCCESS" ? "dot on" : "dot"} /> {swap ? SWAP_LABEL[swap.status] ?? swap.status : "1Click status unknown"}
+          <span className={swap?.status === "SUCCESS" ? "dot on" : "dot"} /> {swap ? SWAP_LABEL[swap.status] ?? swap.status : "Couldn't reach 1Click. Refresh status to try again."}
           {dest && (
             <>
               {" · "}

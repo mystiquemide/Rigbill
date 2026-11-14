@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Skeleton } from "./ui";
 import { CONTRACT_ID, network } from "./config";
 import { runChecks, type Check } from "./proof";
 import { SiteNav } from "./SiteNav";
@@ -46,7 +47,7 @@ export default function ProofPage() {
                 {ranAt ? `Checked ${ranAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : "Checking now"} against {CONTRACT_ID} on NEAR {network} and Bitcoin {network === "testnet" ? "testnet4" : "mainnet"}. The same checks run with npm run verify.
               </p>
               <button className="btn-dark" onClick={run} disabled={status === "running"}>
-                {status === "running" ? `Checking… ${checks.length} done` : "Run checks again"}
+                {status === "running" ? `Checking… ${checks.length} of 15 done` : "Run checks again"}
               </button>
             </div>
           </div>
@@ -64,7 +65,7 @@ export default function ProofPage() {
               <section key={key} className="proof-group" aria-label={title}>
                 <h2 className="proof-group-title">{title}</h2>
                 <div className="checks open-checks">
-                {rows.length === 0 && <p className="skeleton">Reading NEAR and Bitcoin&hellip;</p>}
+                {rows.length === 0 && <Skeleton label="Reading NEAR and Bitcoin…" lines={2} />}
                 {rows.map((c, i) => (
                   <div key={i} className="check">
                     <span className={`led${c.ok ? "" : " bad"}`} aria-label={c.ok ? "Passed" : "Failed"} />

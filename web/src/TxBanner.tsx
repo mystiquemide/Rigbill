@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NEARBLOCKS_WEB } from "./config";
-import { explain, msg } from "./format";
+import { explain } from "./format";
 import { txResult } from "./near";
 
 type Banner =
@@ -33,7 +33,7 @@ export function TxBanner({ account }: { account: string }) {
     if (!pending) return;
     txResult(pending, account)
       .then((r) => setBanner(r.ok ? { kind: "ok", hash: pending } : { kind: "refused", hash: pending, text: explain(r.failure) }))
-      .catch((e) => setBanner({ kind: "error", text: `Couldn't read the transaction result: ${msg(e)}` }));
+      .catch(() => setBanner({ kind: "error", text: "Your transaction was sent, but its result isn't readable yet. Check it on nearblocks or refresh in a minute." }));
   }, [pending, account]);
 
   if (!banner) return null;
