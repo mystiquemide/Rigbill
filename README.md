@@ -443,6 +443,8 @@ Runs 85 contract tests (split rules, who may request a split, per-miner outpoint
 | `proof/` | Refusal transactions that `npm run verify` checks |
 | `e2e/` | Browser end-to-end test of the web app on testnet |
 | `docs/screens/` | The screenshots in this README |
+| `SECURITY.md` | How to report a vulnerability, and what's in scope |
+| `CONTRIBUTING.md` | Setup, tests and what a pull request needs |
 
 ## Known limits
 
