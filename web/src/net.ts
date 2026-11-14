@@ -9,6 +9,8 @@ export const NEAR_RPCS: string[] = env.VITE_NEAR_RPC_URL
   : testnet
     ? ["https://rpc.testnet.near.org", "https://test.rpc.fastnear.com"]
     : ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"];
+/** Regular nodes drop transactions after a few days. Archival nodes keep them all. */
+const NEAR_ARCHIVAL = testnet ? "https://archival-rpc.testnet.near.org" : "https://archival-rpc.mainnet.near.org";
 export const ESPLORAS: string[] = env.VITE_ESPLORA_URL
   ? [env.VITE_ESPLORA_URL]
   : testnet
@@ -38,7 +40,9 @@ async function tryEach(urls: string[], call: (url: string) => Promise<Response>)
 
 /** NEAR JSON-RPC. Returns the parsed body, errors included, so callers can read contract panics. */
 export async function nearRpc(method: string, params: unknown): Promise<any> {
-  const res = await tryEach(NEAR_RPCS, (url) =>
+  // Transaction lookups go to the archival node first: regular nodes take over 30 s to give up on one they've pruned.
+  const urls = method === "tx" && !env.VITE_NEAR_RPC_URL ? [NEAR_ARCHIVAL, ...NEAR_RPCS] : NEAR_RPCS;
+  const res = await tryEach(urls, (url) =>
     fetch(url, {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       method: "POST",

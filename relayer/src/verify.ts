@@ -49,7 +49,9 @@ const RPC_URLS = [
 
 async function rpc(method: string, params: unknown): Promise<any> {
   let last: unknown;
-  for (const url of RPC_URLS) {
+  // Transaction lookups start at the archival node: regular nodes take over 30 s to give up on one they've pruned.
+  const urls = method === "tx" ? [RPC_URLS[RPC_URLS.length - 1], ...RPC_URLS.slice(0, -1)] : RPC_URLS;
+  for (const url of urls) {
     try {
       const res = await fetch(url, {
         method: "POST",
