@@ -16,6 +16,7 @@ const RULES: Record<string, string> = {
   BAD_BILL_STATE: "This bill changed since the page loaded. Refresh to see where it is now.",
   NOT_HOST: "Only the host who issued this bill can do that. Sign in with that account.",
   NOT_MINER: "Only the billed miner can do that. Sign in with that account.",
+  MINER_KEY_PENDING: "Your payout address is still being derived by NEAR's MPC network. Save your settings again to retry, then try once it shows.",
   MINER_NOT_REGISTERED: "That miner hasn't set up Rigbill yet. Ask them to sign in and create a payout address, then issue the bill.",
   BAD_ADDRESS: "That isn't a native segwit address for this network. Use one that starts with bc1 and try again.",
   BAD_DUE_DATE: "Pick a due date in the future.",

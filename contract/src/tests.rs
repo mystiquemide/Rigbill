@@ -231,7 +231,7 @@ fn rejects_unknown_miner() {
 }
 
 #[test]
-#[should_panic(expected = "MINER_NOT_REGISTERED")]
+#[should_panic(expected = "MINER_KEY_PENDING")]
 fn rejects_miner_without_derived_key() {
     set_ctx(miner_id(), NearToken::from_near(0), vec![]);
     let mut c = Rigbill::new(signer_id(), BtcNetwork::Mainnet);
@@ -1121,4 +1121,57 @@ fn due_date_is_capped_at_90_days() {
     let mut c = registered();
     at(host_id(), BILL_STORAGE_DEPOSIT, T0);
     c.issue_bill(miner_id(), U64(15_000), "2027".into(), U64(T0 + 91 * DAY), HOST_ADDR.into());
+}
+
+// State machine fixes.
+
+#[test]
+fn issued_bill_expires_too() {
+    let mut c = registered();
+    let id = issue(&mut c, T0);
+    let due = T0 + 30 * DAY;
+    at(host_id(), NearToken::from_near(0), due + GRACE_PERIOD_NS + 1);
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Expired);
+    assert_eq!(c.expire_bill(id), BillStatus::Expired);
+}
+
+#[test]
+fn host_can_confirm_a_payment_that_landed_after_expiry() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    let late = T0 + 30 * DAY + GRACE_PERIOD_NS + 1;
+    at(host_id(), NearToken::from_near(0), late);
+    assert_eq!(c.expire_bill(id), BillStatus::Expired);
+    c.confirm_paid(id);
+    assert_eq!(c.get_bill(id).unwrap().status, BillStatus::Paid);
+    assert!(c.get_open_bill(miner_id()).is_none());
+}
+
+#[test]
+#[should_panic(expected = "BAD_BILL_STATE")]
+fn cannot_confirm_an_expired_bill_that_was_never_paid() {
+    let (mut c, id) = quoted(T0);
+    at(host_id(), NearToken::from_near(0), T0 + 30 * DAY + GRACE_PERIOD_NS + 1);
+    c.expire_bill(id);
+    c.confirm_paid(id);
+}
+
+#[test]
+fn refund_marks_the_split_refunded() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    sign_ok(&mut c, 0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.report_refund(id);
+    assert_eq!(c.get_split(U64(0)).unwrap().status, SplitStatus::Refunded);
+    assert!(c.get_bill(id).unwrap().split_id.is_none());
+}
+
+#[test]
+fn paid_releases_the_miners_lock_for_cold_only_payouts() {
+    let (mut c, id) = quoted(T0);
+    pay_split(&mut c, T0);
+    at(host_id(), NearToken::from_near(0), T0);
+    c.confirm_paid(id);
+    assert!(c.get_open_bill(miner_id()).is_none());
 }

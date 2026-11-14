@@ -63,6 +63,9 @@ pub enum SplitStatus {
     Failed,
     /// Signed, then released by the miner because it was never broadcast.
     Released,
+    /// Signed and broadcast, then 1Click refunded the swap. Its coins are
+    /// spent, so it stays reserved; the refund arrives as a new payout.
+    Refunded,
 }
 
 #[near(serializers = [borsh, json])]
@@ -351,7 +354,9 @@ impl Rigbill {
             .payout_pubkey_hash
             .as_ref()
             .and_then(|v| v.as_slice().try_into().ok())
-            .unwrap_or_else(|| fail("MINER_NOT_REGISTERED"));
+            // Registered, but v1.signer hasn't answered yet (or failed: calling
+            // register_miner again retries the derivation).
+            .unwrap_or_else(|| fail("MINER_KEY_PENDING"));
 
         // Only the miner, the open bill's host, or a relayer the miner approved
         // may request signatures. Anyone else could reserve a payout's outpoint
@@ -395,7 +400,7 @@ impl Rigbill {
                     // Accepted without a quote, or a split for this bill is already in flight.
                     _ => fail("BILL_OPEN_HOST_OUTPUT_REQUIRED"),
                 };
-                if q.deadline_ns.0 <= env::block_timestamp() {
+                if !q.is_live(env::block_timestamp()) {
                     fail("QUOTE_EXPIRED");
                 }
                 vec![
@@ -634,7 +639,7 @@ impl Rigbill {
             }
             // While the quote is live the split may already be on its way to
             // 1Click. Releasing then would undo a payment the host may receive.
-            let quote_live = b.quote.as_ref().is_some_and(|q| q.deadline_ns.0 > env::block_timestamp());
+            let quote_live = b.quote.as_ref().is_some_and(|q| q.is_live(env::block_timestamp()));
             if b.status == bills::BillStatus::Paying && b.split_id == Some(split_id) && quote_live {
                 fail("QUOTE_STILL_LIVE");
             }

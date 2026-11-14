@@ -36,6 +36,13 @@ pub struct Quote {
     pub deadline_ns: U64,
 }
 
+impl Quote {
+    /// The one definition of a usable quote: its deadline is still ahead.
+    pub fn is_live(&self, now: u64) -> bool {
+        self.deadline_ns.0 > now
+    }
+}
+
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug)]
 pub struct Bill {
@@ -60,7 +67,7 @@ impl Bill {
         // miner's lock forever (FR-014).
         matches!(
             self.status,
-            BillStatus::Accepted | BillStatus::QuoteApproved | BillStatus::Paying
+            BillStatus::Issued | BillStatus::Accepted | BillStatus::QuoteApproved | BillStatus::Paying
         ) && now > self.due_ns.0.saturating_add(GRACE_PERIOD_NS)
     }
 
@@ -92,22 +99,24 @@ impl Rigbill {
             .unwrap_or_else(|| fail("BILL_NOT_FOUND"))
     }
 
+    /// The only way a bill ends: sets its final status and releases the
+    /// miner's open-bill lock if this bill holds it.
+    pub(crate) fn close_bill(&mut self, id: u64, status: BillStatus) {
+        let miner = {
+            let b = self.bill_mut(id);
+            b.status = status;
+            b.miner.clone()
+        };
+        if self.open_bill.get(&miner) == Some(&id) {
+            self.open_bill.remove(&miner);
+        }
+    }
+
     /// Applies lazy expiry and releases the miner's open-bill lock.
     pub(crate) fn settle_expiry(&mut self, id: u64) {
         let now = env::block_timestamp();
-        let (expired, miner) = {
-            let b = self.bill_mut(id);
-            if b.expired_at(now) {
-                b.status = BillStatus::Expired;
-                (true, b.miner.clone())
-            } else {
-                (false, b.miner.clone())
-            }
-        };
-        if expired {
-            if self.open_bill.get(&miner) == Some(&id) {
-                self.open_bill.remove(&miner);
-            }
+        if self.bill_mut(id).expired_at(now) {
+            self.close_bill(id, BillStatus::Expired);
             event("bill_expired", json!({"bill_id": U64(id)}));
         }
     }
@@ -249,7 +258,7 @@ impl Rigbill {
         }
         match (&b.status, &b.quote) {
             (BillStatus::Accepted, _) => {}
-            (BillStatus::QuoteApproved, Some(q)) if q.deadline_ns.0 <= now => {}
+            (BillStatus::QuoteApproved, Some(q)) if !q.is_live(now) => {}
             _ => fail("BAD_BILL_STATE"),
         }
         if deadline_ns.0 <= now {
@@ -277,26 +286,26 @@ impl Rigbill {
     }
 
     /// FR-013, P0: the host confirms the USDC arrived. Releases the miner's lock.
+    /// A swap can land after the bill's grace period, so a bill that expired
+    /// while a split was paying it can still be confirmed paid.
     pub fn confirm_paid(&mut self, bill_id: U64) {
         let caller = env::predecessor_account_id();
-        let miner = {
+        {
             let b = self.bill_mut(bill_id.0);
             if b.host != caller {
                 fail("NOT_HOST");
             }
-            if b.status != BillStatus::Paying {
+            let late = b.status == BillStatus::Expired && b.split_id.is_some();
+            if b.status != BillStatus::Paying && !late {
                 fail("BAD_BILL_STATE");
             }
-            b.status = BillStatus::Paid;
-            b.miner.clone()
-        };
-        if self.open_bill.get(&miner) == Some(&bill_id.0) {
-            self.open_bill.remove(&miner);
         }
+        self.close_bill(bill_id.0, BillStatus::Paid);
         event("bill_paid", json!({"bill_id": bill_id}));
     }
 
-    /// FR-013: 1Click refunded the swap to the payout address, so the bill
+    /// FR-013: 1Click refunded the swap to the payout address (or the swap
+    /// failed or got less than quoted, which 1Click also refunds), so the bill
     /// goes back to Accepted and the host locks a new quote. Host only: a
     /// false refund report could only cost the host.
     pub fn report_refund(&mut self, bill_id: U64) {
@@ -309,8 +318,15 @@ impl Rigbill {
         }
         b.status = BillStatus::Accepted;
         b.quote = None;
-        b.split_id = None;
-        event("bill_refunded", json!({"bill_id": bill_id}));
+        let split_id = b.split_id.take();
+        if let Some(id) = split_id {
+            if let Some(sp) = self.splits.get_mut(&id.0) {
+                if sp.status == crate::SplitStatus::Signed {
+                    sp.status = crate::SplitStatus::Refunded;
+                }
+            }
+        }
+        event("bill_refunded", json!({"bill_id": bill_id, "split_id": split_id}));
     }
 
     /// Anyone can apply expiry (FR-014) so the miner's lock releases.

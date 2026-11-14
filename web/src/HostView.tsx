@@ -4,7 +4,7 @@ import { BILL_STORAGE_DEPOSIT, MEMPOOL_WEB, network } from "./config";
 import { fmtDate, fmtTime, fromNs, msg, sats, toNs, usd } from "./format";
 import { Lifecycle } from "./Lifecycle";
 import { Link } from "./Link";
-import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, refetchBillUntilChanged, type Bill, type Split } from "./near";
+import { derivedPublicKey, getBill, getBillsForHost, getMiner, getSplit, quoteLive, refetchBillUntilChanged, type Bill, type Split } from "./near";
 import { ONECLICK_MIN_SATS, btcPriceUsd, quoteBillInBtc, swapStatus, usdToSats, type Quote, type SwapStatusResponse } from "./oneclick";
 import { usePath } from "./routing";
 import { SplitStatus } from "./SplitStatus";
@@ -176,7 +176,7 @@ function HostBillDetail({ account, id }: { account: string; id: string }) {
 
 function HostBill({ bill, back, onChanged }: { bill: Bill; back: React.ReactNode; onChanged: () => void }) {
   const [now] = useState(() => Date.now());
-  const quoteExpired = !!bill.quote && fromNs(bill.quote.deadline_ns).getTime() <= now;
+  const quoteExpired = !!bill.quote && !quoteLive(bill.quote, now);
   const needsQuote = bill.status === "Accepted" || (bill.status === "QuoteApproved" && quoteExpired);
   return (
     <div className="bill-detail">
@@ -194,7 +194,7 @@ function HostBill({ bill, back, onChanged }: { bill: Bill; back: React.ReactNode
           {bill.status === "Issued" && <IssuedPanel bill={bill} onChanged={onChanged} />}
           {needsQuote && <LockQuote bill={bill} expired={quoteExpired} onDone={onChanged} />}
           {bill.status === "QuoteApproved" && !quoteExpired && <LockedPanel bill={bill} />}
-          {(bill.status === "Paying" || bill.status === "Paid") && <PaymentPanel bill={bill} onChanged={onChanged} />}
+          {(bill.status === "Paying" || bill.status === "Paid" || (bill.status === "Expired" && bill.split_id)) && <PaymentPanel bill={bill} onChanged={onChanged} />}
         </div>
         <Lifecycle bill={bill} side="host" />
       </div>
@@ -254,7 +254,8 @@ function PaymentPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }
   const [split, setSplit] = useState<Split | null>(null);
   useEffect(() => { if (bill.split_id) getSplit(bill.split_id).then(setSplit).catch(() => setSplit(null)); }, [bill.split_id]);
   const [toHost, toMiner] = split?.outputs ?? [];
-  const paying = bill.status === "Paying";
+  // A bill that expired while a split was paying it can still be confirmed paid.
+  const paying = bill.status === "Paying" || (bill.status === "Expired" && !!bill.split_id);
   const swap = useSwapWatch(paying && network === "mainnet" ? bill.quote?.deposit_address : undefined);
   const delivered = swap?.status === "SUCCESS";
   const outTx = swap?.swapDetails?.destinationChainTxHashes?.[0]?.hash;
@@ -279,13 +280,22 @@ function PaymentPanel({ bill, onChanged }: { bill: Bill; onChanged: () => void }
           <button onClick={act("confirm_paid")} disabled={!!busy}>{busy === "confirm_paid" ? "Waiting for your wallet…" : "Confirm paid"}</button>
         </div>
       )}
-      {paying && !delivered && (
+      {paying && swap && ["REFUNDED", "FAILED", "INCOMPLETE_DEPOSIT"].includes(swap.status) && (
+        <div className="delivered" role="status">
+          <p className="kicker" style={{ margin: 0 }}>
+            {swap.status === "REFUNDED" ? "1Click refunded the swap" : swap.status === "FAILED" ? "The swap failed" : "1Click received less than quoted"}
+          </p>
+          <p style={{ margin: "8px 0 16px" }}>The BTC goes back to the miner's payout address. Report it so the bill returns to accepted, then lock a new quote.</p>
+          <button onClick={act("report_refund")} disabled={!!busy}>{busy === "report_refund" ? "Waiting for your wallet…" : "Report and lock a new quote"}</button>
+        </div>
+      )}
+      {paying && !delivered && !(swap && ["REFUNDED", "FAILED", "INCOMPLETE_DEPOSIT"].includes(swap.status)) && (
         <>
           {swap && <p className="note">1Click is still working on it ({swap.status.toLowerCase().replace(/_/g, " ")}). This updates on its own.</p>}
           <p className="note note-review">Check that {usd(Number(bill.usd_cents))} USDC reached <span className="mono">{bill.host_address}</span>, then confirm. If 1Click refunded the swap, report it and lock a new quote.</p>
           <div className="actions">
             <button onClick={act("confirm_paid")} disabled={!!busy}>{busy === "confirm_paid" ? "Waiting for your wallet…" : "Confirm paid"}</button>
-            <button className="ghost" onClick={act("report_refund")} disabled={!!busy}>{busy === "report_refund" ? "Waiting for your wallet…" : "1Click refunded it"}</button>
+            <button className="ghost" onClick={act("report_refund")} disabled={!!busy}>{busy === "report_refund" ? "Waiting for your wallet…" : "Swap refunded or failed"}</button>
           </div>
         </>
       )}

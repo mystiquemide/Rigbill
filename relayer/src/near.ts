@@ -26,7 +26,7 @@ export interface Split {
   outputs: { address: string; value: string }[];
   sighashes: string[];
   signatures: string[];
-  status: "Requested" | "Signed" | "Failed";
+  status: "Requested" | "Signed" | "Failed" | "Released" | "Refunded";
   bill_id: string | null;
 }
 

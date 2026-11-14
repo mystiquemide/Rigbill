@@ -210,7 +210,8 @@ Runs 80 contract tests (split rules, who may request a split, per-miner outpoint
 - Input values come from the caller. The contract can't read Bitcoin, so it signs over the values it's given, and a wrong value produces a signature no node will accept. That's why only the miner, the open bill's host or a relayer the miner approved may ask for a split, and why the miner can `release_split` a signed split that was never broadcast (in the app under Release an unused split). Release is refused while the bill's quote is still live.
 - The contract only tracks payouts it signed. It can't stop a transaction signed elsewhere, but the payout address has no other key, so there is nothing else to sign with.
 - A miner can still point their pool at a different address off-chain. Hosts usually control the rigs and can watch each rig's payout address.
-- An unpaid bill expires 7 days after its due date, which releases the miner. A due date can be at most 90 days out.
+- A bill that isn't paid expires 7 days after its due date, which releases the miner. A due date can be at most 90 days out. Expiry is applied lazily: views report it at once, but the `bill_expired` event is only logged when a call settles it (anyone can call `expire_bill`). A swap that lands after expiry can still be confirmed paid.
+- Payout reservations written before the per-miner fix are no longer read. The only one on mainnet belongs to the bill #0 split, whose coins are spent.
 - The contract can't check that the host's deposit address belongs to 1Click. It holds the host to the quote they locked, and the miner's ceiling caps what any quote can take.
 - Each split pays for the storage it writes (up to about 0.03 NEAR for four inputs) and gets the rest back.
 - The contract account keeps a full-access key, so its code can be upgraded. No method moves funds outside the split rules.

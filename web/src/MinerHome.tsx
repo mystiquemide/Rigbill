@@ -5,7 +5,7 @@ import { getTipHeight, getUtxos, type Utxo } from "./esplora";
 import { fmtDate, fmtTime, fromNs, msg, sats, usd } from "./format";
 import { Link } from "./Link";
 import { MinerForm } from "./MinerSetup";
-import { getBill, getBillsForMiner, getOpenBill, getRelayers, getSplit, type Bill, type Miner, type Split } from "./near";
+import { getBill, getBillsForMiner, getOpenBill, getRelayers, getSplit, quoteLive, type Bill, type Miner, type Split } from "./near";
 import { SplitStatus } from "./SplitStatus";
 import { SweepButton } from "./SweepButton";
 import { ErrorBox, ErrorNote, Skeleton, StatusTag } from "./ui";
@@ -119,7 +119,7 @@ function BalancePanel({ address }: { address: string }) {
 function OpenBill({ bill }: { bill: Bill }) {
   const q = bill.quote;
   const [now] = useState(() => Date.now());
-  const quoteLive = q && fromNs(q.deadline_ns).getTime() > now;
+  const quoteIsLive = quoteLive(q, now);
   return (
     <section className="panel open-bill" aria-labelledby="open-title">
       <div className="row"><p className="kicker" id="open-title">Open bill #{bill.id}</p><StatusTag status={bill.status} /></div>
@@ -135,8 +135,8 @@ function OpenBill({ bill }: { bill: Bill }) {
           {q && <div className="kv"><dt>Quote valid until</dt><dd className="num">{fmtTime(fromNs(q.deadline_ns))}</dd></div>}
         </dl>
       </div>
-      {bill.status === "QuoteApproved" && quoteLive && <p className="note note-lime">Your next payout pays {sats(Number(q!.amount_in_sats))} to your host first. Everything above that goes to your wallet.</p>}
-      {bill.status === "QuoteApproved" && !quoteLive && <p className="note note-warn">The locked quote has expired. Your host needs to lock a new one before the next payout can be split.</p>}
+      {bill.status === "QuoteApproved" && quoteIsLive && <p className="note note-lime">Your next payout pays {sats(Number(q!.amount_in_sats))} to your host first. Everything above that goes to your wallet.</p>}
+      {bill.status === "QuoteApproved" && !quoteIsLive && <p className="note note-warn">The locked quote has expired. Your host needs to lock a new one before the next payout can be split.</p>}
       {bill.status === "Accepted" && <p className="note note-review">Waiting for your host to lock a quote. Payouts stay at your address until then.</p>}
       {bill.status === "Paying" && <SplitStatus bill={bill} />}
     </section>

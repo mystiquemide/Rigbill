@@ -51,9 +51,13 @@ export interface Split {
   miner: string;
   txid: string;
   outputs: { address: string; value: string }[];
-  status: "Requested" | "Signed" | "Failed" | "Released";
+  status: "Requested" | "Signed" | "Failed" | "Released" | "Refunded";
   bill_id: string | null;
 }
+
+/** The one definition of a usable quote, matching the contract: its deadline is still ahead. */
+export const quoteLive = (q: { deadline_ns: string } | null | undefined, nowMs = Date.now()) =>
+  !!q && Number(BigInt(q.deadline_ns) / 1_000_000n) > nowMs;
 
 export const getRelayers = (miner: string) => view<string[]>(CONTRACT_ID, "get_relayers", { miner });
 
