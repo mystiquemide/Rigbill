@@ -42,6 +42,18 @@ Take NEAR out and there's no product left.
 - The NEAR contract is the policy. It builds the BIP143 sighash for every Bitcoin transaction itself, checks each output against the open bill and the miner's settings, and only then requests the MPC signature.
 - NEAR Intents 1Click turns the bill's share of the payout into USDC on Base at a quote the host locks and the miner's ceiling caps.
 
+### The NEAR stack
+
+| NEAR piece | Where | What Rigbill uses it for |
+|---|---|---|
+| NEAR smart contract (Rust, `near-sdk` 5.30.1) | [`v1.rigbill.near`](https://nearblocks.io/address/v1.rigbill.near) on mainnet, `v1.rigbill.testnet` on testnet | Holds miners, bills and quotes, builds every Bitcoin sighash itself, enforces the split rules and reserves each payout per miner |
+| Chain Signatures | `v1.signer` (`derived_public_key`, `sign`, secp256k1 domain 0) | Derives each miner's Bitcoin payout address from the contract's account and signs only the splits the contract approves. No person or server holds the key |
+| NEAR Intents 1Click | `1click.chaindefuser.com` (`quote`, `deposit/submit`, `status`) | Turns the host's share of a payout from BTC into USDC on Base at a locked EXACT_OUTPUT quote, then reports the swap so the host can confirm paid |
+| NEAR Connect (`@hot-labs/near-connect` 0.12) | Web app | Wallet sign-in for miners and hosts (Meteor, Intear, Nightly and others) |
+| `near-api-js` 7 | Relayer CLI | Sends `sign_split`, reads results and verifies every MPC signature before broadcasting |
+| NEAR RPC | FastNEAR, with the official RPC as fallback | Live reads for the app, `/proof` and `npm run verify` |
+| NEP-297 events | `EVENT_JSON` logs from the contract | `bill_*`, `split_requested`, `split_result` and `split_released` events for indexers |
+
 ## Proof
 
 The full loop runs on NEAR mainnet, Bitcoin mainnet and Base. Check it yourself with no keys and no setup beyond Node 20+:
