@@ -149,7 +149,7 @@ cd contract && cargo test
 npm test
 ```
 
-Runs 74 contract tests (split rules, who may request a split, releasing an unused split, every refusal, BIP143 sighash vectors, bill lifecycle, quote ceiling and expiry) and 8 relayer tests (transaction parity with the contract, signature checks). CI runs these on every push along with clippy, the web build and `npm run verify` against the live chains.
+Runs 80 contract tests (split rules, who may request a split, per-miner outpoints, storage cost, releasing an unused split, every refusal, BIP143 sighash vectors, bill lifecycle, quote ceiling and expiry) and 8 relayer tests (transaction parity with the contract, signature checks). CI runs these on every push along with clippy, the web build and `npm run verify` against the live chains.
 
 ## Repository
 
@@ -167,7 +167,9 @@ Runs 74 contract tests (split rules, who may request a split, releasing an unuse
 - Input values come from the caller. The contract can't read Bitcoin, so it signs over the values it's given, and a wrong value produces a signature no node will accept. That's why only the miner, the open bill's host or a relayer the miner approved may ask for a split, and why the miner can `release_split` a signed split that was never broadcast.
 - The contract only tracks payouts it signed. It can't stop a transaction signed elsewhere, but the payout address has no other key, so there is nothing else to sign with.
 - A miner can still point their pool at a different address off-chain. Hosts usually control the rigs and can watch each rig's payout address.
-- An unpaid bill expires 7 days after its due date, which releases the miner.
+- An unpaid bill expires 7 days after its due date, which releases the miner. A due date can be at most 90 days out.
+- The contract can't check that the host's deposit address belongs to 1Click. It holds the host to the quote they locked, and the miner's ceiling caps what any quote can take.
+- Each split pays for the storage it writes (up to about 0.03 NEAR for four inputs) and gets the rest back.
 - The contract account keeps a full-access key, so its code can be upgraded. No method moves funds outside the split rules.
 - 1Click has a minimum swap, a little over $6 of USDC when this ran, so very small bills can't be paid this way.
 

@@ -268,9 +268,9 @@ fn valid_split_reserves_outpoints_and_records_sighash() {
     assert_eq!(s.status, SplitStatus::Requested);
     assert_eq!(s.sighashes.len(), 2);
     assert_eq!(s.txid.len(), 64);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
-    assert_eq!(c.get_outpoint(TXID_B.into(), 3), Some(U64(0)));
-    assert_eq!(c.get_outpoint(TXID_B.into(), 0), None);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(0)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_B.into(), 3), Some(U64(0)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_B.into(), 0), None);
     assert!(get_logs()[0].contains("split_requested"));
 
     // Sighash must equal an independent BIP143 computation over the
@@ -340,7 +340,7 @@ fn signed_callback_stores_signatures() {
     assert_eq!(c.on_signed(U64(0)), SplitStatus::Signed);
     let s = c.get_split(U64(0)).unwrap();
     assert_eq!(s.signatures, vec![String::from_utf8(sig.to_vec()).unwrap()]);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(0)));
 }
 
 #[test]
@@ -360,15 +360,15 @@ fn failed_sign_releases_outpoints() {
         ],
     );
     assert_eq!(c.on_signed(U64(0)), SplitStatus::Failed);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
-    assert_eq!(c.get_outpoint(TXID_B.into(), 1), None);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), None);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_B.into(), 1), None);
     // The UTXOs can be split again.
     split(
         &mut c,
         vec![input(TXID_A, 0, 10_000)],
         vec![output(COLD, 8_000)],
     );
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(1)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(1)));
 }
 
 #[test]
@@ -717,7 +717,7 @@ fn cold_only_allowed_again_after_bill_expires() {
         vec![input(TXID_A, 0, 15_000)],
         vec![output(COLD, 13_000)],
     );
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(0)));
 }
 
 // ---------------------------------------------------------------- phase 4: paying the bill
@@ -855,7 +855,7 @@ fn failed_sign_returns_bill_to_quote_approved() {
     let b = c.get_bill(id).unwrap();
     assert_eq!(b.status, BillStatus::QuoteApproved);
     assert_eq!(b.split_id, None);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), None);
 }
 
 #[test]
@@ -977,13 +977,13 @@ fn miner_releases_a_wrong_value_split_and_splits_again() {
     // A split signed over a wrong input value can never be broadcast.
     sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 999_999)], vec![output(COLD, 999_000)]);
     sign_ok(&mut c, 0);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(0)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(0)));
     set_ctx(miner_id(), NearToken::from_near(0), vec![]);
     c.release_split(U64(0));
     assert_eq!(c.get_split(U64(0)).unwrap().status, SplitStatus::Released);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), None);
     sign_as(&mut c, "miner.near", vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), Some(U64(1)));
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(1)));
 }
 
 #[test]
@@ -1023,12 +1023,13 @@ fn release_returns_unpaid_bill_to_its_quote() {
     let (mut c, id) = quoted(T0);
     pay_split(&mut c, T0);
     sign_ok(&mut c, 0);
-    at(miner_id(), NearToken::from_near(0), T0);
+    // The quote ran out without the swap completing, so the miner may release.
+    at(miner_id(), NearToken::from_near(0), T0 + 3 * DAY + 1);
     c.release_split(U64(0));
     let b = c.get_bill(id).unwrap();
     assert_eq!(b.status, BillStatus::QuoteApproved);
     assert_eq!(b.split_id, None);
-    assert_eq!(c.get_outpoint(TXID_A.into(), 0), None);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), None);
 }
 
 #[test]
@@ -1041,4 +1042,83 @@ fn cannot_release_the_split_that_paid_a_bill() {
     c.confirm_paid(id);
     at(miner_id(), NearToken::from_near(0), T0);
     c.release_split(U64(0));
+}
+
+// Regression tests for the second review.
+
+fn register_as(c: &mut Rigbill, who: &str) {
+    set_ctx(who.parse().unwrap(), MINER_STORAGE_DEPOSIT, vec![]);
+    let _ = c.register_miner(COLD.into(), None);
+    set_ctx(contract_id(), NearToken::from_near(0), vec![PromiseResult::Successful(derived_key_json())]);
+    c.on_derived_key(who.parse().unwrap());
+}
+
+#[test]
+fn another_miner_cannot_freeze_your_payout() {
+    let mut c = registered();
+    register_as(&mut c, "attacker.near");
+    // The attacker reserves the victim's outpoint under their own name.
+    set_ctx("attacker.near".parse().unwrap(), SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(1)), vec![]);
+    let _ = c.sign_split("attacker.near".parse().unwrap(), vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+    sign_ok(&mut c, 0);
+    // The real miner can still split their own payout.
+    split(&mut c, vec![input(TXID_A, 0, 10_000)], vec![output(COLD, 9_000)]);
+    assert_eq!(c.get_outpoint(miner_id(), TXID_A.into(), 0), Some(U64(1)));
+    assert_eq!(c.get_outpoint("attacker.near".parse().unwrap(), TXID_A.into(), 0), Some(U64(0)));
+}
+
+#[test]
+#[should_panic(expected = "STORAGE_DEPOSIT_REQUIRED")]
+fn split_requires_its_real_storage_cost() {
+    let mut c = registered();
+    set_ctx("relayer.near".parse().unwrap(), NearToken::from_millinear(10), vec![]);
+    let inputs = (0..4).map(|v| input(TXID_A, v, 10_000)).collect();
+    let _ = c.sign_split(miner_id(), inputs, vec![output(COLD, 39_000)]);
+}
+
+fn measure_split(n: usize) {
+    let (mut c, _) = quoted(T0);
+    c.bills.flush();
+    let before = env::storage_usage();
+    let inputs: Vec<InputArg> = (0..n as u32).map(|v| input(TXID_A, v, 300_000)).collect();
+    let total = 300_000 * n as u64;
+    split_at(&mut c, T0, inputs, vec![output(DEPOSIT_ADDR, 200_000), output(COLD, total - 202_000)]);
+    // A real v1.signer response, about 260 bytes, stored once per input by on_signed.
+    let sig = br#"{"scheme":"Secp256k1","big_r":{"affine_point":"02C2F6B4E8E5D3A1F0E9D8C7B6A5F4E3D2C1B0A9F8E7D6C5B4A3F2E1D0C9B8A7F6"},"s":{"scalar":"3D2C1B0A9F8E7D6C5B4A3F2E1D0C9B8A7F6E5D4C3B2A1F0E9D8C7B6A5F4E3D2C"},"recovery_id":1}"#.to_vec();
+    set_ctx(contract_id(), NearToken::from_near(0), (0..n).map(|_| PromiseResult::Successful(sig.clone())).collect());
+    c.on_signed(U64(0));
+    c.splits.flush();
+    c.outpoints.flush();
+    c.bills.flush();
+    let used = env::storage_usage() - before;
+    assert!(used <= split_storage_bytes(n), "{n} inputs used {used} bytes, bound {}", split_storage_bytes(n));
+    println!("{n} inputs: used {used} bytes, charged for {}", split_storage_bytes(n));
+}
+
+#[test]
+fn storage_bound_covers_one_input() {
+    measure_split(1);
+}
+
+#[test]
+fn storage_bound_covers_four_inputs() {
+    measure_split(4);
+}
+
+#[test]
+#[should_panic(expected = "QUOTE_STILL_LIVE")]
+fn cannot_release_a_payment_while_its_quote_is_live() {
+    let (mut c, _) = quoted(T0);
+    pay_split(&mut c, T0);
+    sign_ok(&mut c, 0);
+    at(miner_id(), NearToken::from_near(0), T0 + DAY);
+    c.release_split(U64(0));
+}
+
+#[test]
+#[should_panic(expected = "BAD_DUE_DATE")]
+fn due_date_is_capped_at_90_days() {
+    let mut c = registered();
+    at(host_id(), BILL_STORAGE_DEPOSIT, T0);
+    c.issue_bill(miner_id(), U64(15_000), "2027".into(), U64(T0 + 91 * DAY), HOST_ADDR.into());
 }

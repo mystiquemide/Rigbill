@@ -12,8 +12,8 @@ export const ESPLORA: string = env.VITE_ESPLORA_URL || (testnet ? "https://block
 export const MEMPOOL_WEB = testnet ? "https://mempool.space/testnet4" : "https://mempool.space";
 export const NEARBLOCKS_WEB = testnet ? "https://testnet.nearblocks.io" : "https://nearblocks.io";
 
-/** Must match the contract's SPLIT_STORAGE_DEPOSIT (plus 1 yocto per input). */
-export const SPLIT_STORAGE_DEPOSIT = 10n ** 22n;
+/** The contract's SPLIT_STORAGE_DEPOSIT (0.03 NEAR, covers four inputs) plus 1 yocto per input. The unused part is refunded. */
+export const SPLIT_STORAGE_DEPOSIT = 3n * 10n ** 22n;
 /** Must match the contract's MINER_STORAGE_DEPOSIT and DEFAULT_FEE_CAP. */
 export const MINER_STORAGE_DEPOSIT = 10n ** 22n;
 export const DEFAULT_FEE_CAP = 3000;

@@ -10,6 +10,8 @@ use near_sdk::{env, near, AccountId, NearToken};
 pub const BILL_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(10);
 /// FR-014: an unpaid accepted bill expires this long after its due date.
 pub const GRACE_PERIOD_NS: u64 = 7 * 24 * 60 * 60 * 1_000_000_000;
+/// A bill can be due at most 90 days out, so a host can't hold payouts for years.
+pub const MAX_DUE_NS: u64 = 90 * 24 * 60 * 60 * 1_000_000_000;
 pub const MAX_PERIOD_LEN: usize = 64;
 
 #[near(serializers = [borsh, json])]
@@ -148,7 +150,7 @@ impl Rigbill {
         if period.is_empty() || period.len() > MAX_PERIOD_LEN {
             fail("BAD_PERIOD");
         }
-        if due_ns.0 <= env::block_timestamp() {
+        if due_ns.0 <= env::block_timestamp() || due_ns.0 > env::block_timestamp().saturating_add(MAX_DUE_NS) {
             fail("BAD_DUE_DATE");
         }
         if !valid_evm_address(&host_address) {

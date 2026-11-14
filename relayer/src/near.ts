@@ -4,8 +4,8 @@ import { CONTRACT_ID, NEAR_RPC_URL as RPC_URL, SIGNER_ID } from "./config.js";
 
 export { CONTRACT_ID, SIGNER_ID };
 
-/** Must match the contract's SPLIT_STORAGE_DEPOSIT (0.01 NEAR) plus 1 yocto per input. */
-const SPLIT_DEPOSIT = 10n ** 22n;
+/** The contract's SPLIT_STORAGE_DEPOSIT (0.03 NEAR, covers four inputs) plus 1 yocto per input. The unused part is refunded. */
+const SPLIT_DEPOSIT = 3n * 10n ** 22n;
 
 export const provider = new JsonRpcProvider({ url: RPC_URL });
 

@@ -17,7 +17,8 @@ pub const TX_LOCK_TIME: u32 = 0;
 pub const DUST_LIMIT: u64 = 546;
 pub const MAX_INPUTS: usize = 4;
 pub const DEFAULT_FEE_CAP: u64 = 3_000;
-pub const SPLIT_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(10);
+/// What clients attach to sign_split: covers four inputs. The unused part is refunded.
+pub const SPLIT_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(30);
 pub const MINER_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(10);
 
 const GAS_PER_SIGN: Gas = Gas::from_tgas(30);
@@ -176,10 +177,23 @@ pub fn address_to_script(addr: &str, network: BtcNetwork) -> Vec<u8> {
     script
 }
 
-fn outpoint_key(txid: &[u8; 32], vout: u32) -> Vec<u8> {
-    let mut k = txid.to_vec();
+/// Outpoints are reserved per miner. A coin can only be spent by the key of
+/// the miner whose payout address holds it, so a reservation under another
+/// miner's name can never block the real owner. Keys written before this
+/// change (txid ++ vout, no prefix) are no longer read.
+fn outpoint_key(miner: &AccountId, txid: &[u8; 32], vout: u32) -> Vec<u8> {
+    let mut k = b"m:".to_vec();
+    k.extend_from_slice(miner.as_bytes());
+    k.push(b':');
+    k.extend_from_slice(txid);
     k.extend_from_slice(&vout.to_le_bytes());
     k
+}
+
+/// Upper bound on the bytes one split writes: the split record, its outpoint
+/// entries and the bill update. Checked against measured usage in the tests.
+pub fn split_storage_bytes(inputs: usize) -> u64 {
+    900 + 480 * inputs as u64
 }
 
 /// Legacy (non-witness) serialization, used only for the txid.
@@ -356,11 +370,14 @@ impl Rigbill {
         if inputs.is_empty() || inputs.len() > MAX_INPUTS {
             fail("TOO_MANY_INPUTS");
         }
-        let needed =
-            SPLIT_STORAGE_DEPOSIT.saturating_add(NearToken::from_yoctonear(inputs.len() as u128));
-        if env::attached_deposit() < needed {
+        // Storage for what this split writes, plus 1 yocto per MPC sign call.
+        let storage = env::storage_byte_cost().saturating_mul(split_storage_bytes(inputs.len()) as u128);
+        let needed = storage.saturating_add(NearToken::from_yoctonear(inputs.len() as u128));
+        let attached = env::attached_deposit();
+        if attached < needed {
             fail("STORAGE_DEPOSIT_REQUIRED");
         }
+        let refund = attached.saturating_sub(needed);
 
         // FR-007 / BR-001. With an open bill the outputs must be exactly the
         // approved 1Click deposit (quoted amount) followed by the cold address.
@@ -448,7 +465,7 @@ impl Rigbill {
         let split_id = self.next_split_id;
         self.next_split_id += 1;
         for i in &tx_inputs {
-            let k = outpoint_key(&i.txid, i.vout);
+            let k = outpoint_key(&miner, &i.txid, i.vout);
             if self.outpoints.contains_key(&k) {
                 fail("OUTPOINT_ALREADY_SIGNED");
             }
@@ -494,6 +511,10 @@ impl Rigbill {
             json!({"standard":"rigbill","version":"1.0.0","event":"split_requested",
                    "data":[{"split_id": split_id, "miner": miner, "txid": txid}]})
         ));
+
+        if !refund.is_zero() {
+            Promise::new(env::predecessor_account_id()).transfer(refund).detach();
+        }
 
         let path = payout_path(&miner);
         let mut calls: Option<Promise> = None;
@@ -547,7 +568,7 @@ impl Rigbill {
         } else {
             for i in &split.inputs {
                 self.outpoints
-                    .remove(&outpoint_key(&parse_txid(&i.txid), i.vout));
+                    .remove(&outpoint_key(&split.miner, &parse_txid(&i.txid), i.vout));
             }
             split.status = SplitStatus::Failed;
             // Nothing was signed, so the bill goes back to its approved quote.
@@ -611,13 +632,19 @@ impl Rigbill {
             if b.status == bills::BillStatus::Paid {
                 fail("BILL_ALREADY_PAID");
             }
+            // While the quote is live the split may already be on its way to
+            // 1Click. Releasing then would undo a payment the host may receive.
+            let quote_live = b.quote.as_ref().is_some_and(|q| q.deadline_ns.0 > env::block_timestamp());
+            if b.status == bills::BillStatus::Paying && b.split_id == Some(split_id) && quote_live {
+                fail("QUOTE_STILL_LIVE");
+            }
             if b.status == bills::BillStatus::Paying && b.split_id == Some(split_id) {
                 b.status = bills::BillStatus::QuoteApproved;
                 b.split_id = None;
             }
         }
         for i in &split.inputs {
-            let k = outpoint_key(&parse_txid(&i.txid), i.vout);
+            let k = outpoint_key(&split.miner, &parse_txid(&i.txid), i.vout);
             if self.outpoints.get(&k) == Some(&split_id.0) {
                 self.outpoints.remove(&k);
             }
@@ -639,10 +666,10 @@ impl Rigbill {
         self.splits.get(&split_id.0).cloned()
     }
 
-    /// Split id holding this outpoint, if any.
-    pub fn get_outpoint(&self, txid: String, vout: u32) -> Option<U64> {
+    /// Split id holding this outpoint for this miner, if any.
+    pub fn get_outpoint(&self, miner: AccountId, txid: String, vout: u32) -> Option<U64> {
         self.outpoints
-            .get(&outpoint_key(&parse_txid(&txid), vout))
+            .get(&outpoint_key(&miner, &parse_txid(&txid), vout))
             .map(|id| U64(*id))
     }
 
