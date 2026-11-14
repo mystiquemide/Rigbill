@@ -52,9 +52,9 @@ export default function Landing() {
 }
 
 function Hero() {
-  const [paid, setPaid] = useState<PaidBill | null | undefined>(undefined);
+  const [paid, setPaid] = useState<PaidBill | null | undefined>(proofFile ? undefined : null);
   useEffect(() => {
-    if (!proofFile) return setPaid(null);
+    if (!proofFile) return;
     latestPaidBill(proofFile.miner).then(setPaid).catch(() => setPaid(null));
   }, []);
   return (
