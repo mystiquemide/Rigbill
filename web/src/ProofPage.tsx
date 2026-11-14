@@ -45,14 +45,14 @@ export default function ProofPage() {
               <p className="muted" style={{ margin: "0 0 20px" }}>
                 {ranAt ? `Checked ${ranAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : "Checking now"} against {CONTRACT_ID} on NEAR {network} and Bitcoin {network === "testnet" ? "testnet4" : "mainnet"}. The same checks run with npm run verify.
               </p>
-              <button className="ghost" onClick={run} disabled={status === "running"}>
+              <button className="btn-dark" onClick={run} disabled={status === "running"}>
                 {status === "running" ? `Checking… ${checks.length} done` : "Run checks again"}
               </button>
             </div>
           </div>
 
           {status === "error" && (
-            <div className="panel" style={{ borderColor: "var(--lost)", marginBottom: 24 }} role="alert">
+            <div className="proof-error" role="alert">
               <p style={{ margin: 0, color: "var(--lost)" }}>The checks stopped: {error}</p>
             </div>
           )}
@@ -61,8 +61,9 @@ export default function ProofPage() {
             const rows = checks.filter((c) => c.group === key);
             if (rows.length === 0 && status !== "running") return null;
             return (
-              <section key={key} className="panel checks" style={{ marginBottom: 24, paddingTop: 20 }} aria-label={title}>
-                <h2 style={{ fontSize: 19, margin: "0 0 4px" }}>{title}</h2>
+              <section key={key} className="proof-group" aria-label={title}>
+                <h2 className="proof-group-title">{title}</h2>
+                <div className="checks open-checks">
                 {rows.length === 0 && <p className="skeleton">Reading NEAR and Bitcoin&hellip;</p>}
                 {rows.map((c, i) => (
                   <div key={i} className="check">
@@ -71,13 +72,14 @@ export default function ProofPage() {
                     <span className="detail">{c.href ? <a href={c.href} target="_blank" rel="noreferrer">{c.detail}</a> : c.detail}</span>
                   </div>
                 ))}
+                </div>
               </section>
             );
           })}
 
           {status === "done" && (
             <p className="row" style={{ justifyContent: "flex-start", gap: 12 }}>
-              <span className={`chip ${failed ? "chip-lost" : "chip-lime"}`}>{failed ? `${failed} of ${checks.length} checks failed` : `All ${checks.length} checks passed`}</span>
+              <span className={`result-pill${failed ? " bad" : ""}`}><span className="result-tick" aria-hidden="true">{failed ? "!" : "\u2713"}</span>{failed ? `${failed} of ${checks.length} checks failed` : `All ${checks.length} checks passed`}</span>
               <a className="arrow-link" href="https://github.com/mystiquemide/Rigbill/blob/main/relayer/src/verify.ts" target="_blank" rel="noreferrer" style={{ fontSize: 14 }}>View the code that runs these checks</a>
             </p>
           )}
