@@ -38,6 +38,7 @@ export interface PaidBill {
 
 async function rpc(method: string, params: unknown): Promise<any> {
   const res = await fetch(NEAR_RPC, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: "proof", method, params }),
@@ -48,7 +49,7 @@ async function rpc(method: string, params: unknown): Promise<any> {
 }
 
 async function btcTx(txid: string): Promise<any | null> {
-  const res = await fetch(`${ESPLORA}/tx/${txid}`);
+  const res = await fetch(`${ESPLORA}/tx/${txid}`, { signal: AbortSignal.timeout(15000) });
   return res.ok ? res.json() : null;
 }
 
@@ -82,6 +83,11 @@ export async function runChecks(onProgress?: (done: Check[]) => void): Promise<C
   push({ group: "Payout address", label: "Contract stored the key v1.signer derives", detail: `path miner/${miner}`, ok: m?.payout_pubkey === payout.pubkey });
   push({ group: "Payout address", label: "Payout address", detail: payout.address, ok: true, href: `${MEMPOOL_WEB}/address/${payout.address}` });
 
+  // These don't depend on each other, so start them now and read them in order.
+  const refusalTxs = proofFile.refusals.map((r) => rpc("tx", { tx_hash: r.tx, sender_account_id: r.sender, wait_until: "FINAL" }));
+  refusalTxs.forEach((t) => t.catch(() => {}));
+  const quote = mainnetQuoteCheck(payout.pubkey).catch((e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }));
+
   const bills = await view<Bill[]>(CONTRACT_ID, "get_bills_for_miner", { miner, limit: 20 });
   for (const b of [...bills].reverse().filter((x) => x.split_id)) {
     const split = await view<Split | null>(CONTRACT_ID, "get_split", { split_id: b.split_id });
@@ -106,14 +112,14 @@ export async function runChecks(onProgress?: (done: Check[]) => void): Promise<C
     push({ group: "Bills", label: "Confirmed on Bitcoin", detail: tx?.status?.confirmed ? `block ${tx.status.block_height.toLocaleString("en-US")}` : "in mempool", ok: !!tx?.status?.confirmed, href });
   }
 
-  for (const r of proofFile.refusals) {
-    const res = await rpc("tx", { tx_hash: r.tx, sender_account_id: r.sender, wait_until: "FINAL" });
+  for (const [i, r] of proofFile.refusals.entries()) {
+    const res = await refusalTxs[i];
     const outcomes = [res.transaction_outcome, ...res.receipts_outcome];
     const failure = JSON.stringify(outcomes.map((o: any) => o.outcome.status?.Failure).find(Boolean) ?? "");
     const reachedSigner = res.receipts_outcome.some((o: any) => o.outcome.executor_id === SIGNER_ID);
     push({ group: "Refusals", label: r.attempt, detail: r.expect, ok: failure.includes(r.expect) && !reachedSigner, href: `${NEARBLOCKS_WEB}/txns/${r.tx}` });
   }
-  const q = await mainnetQuoteCheck(payout.pubkey).catch((e) => ({ error: e instanceof Error ? e.message : String(e) }));
+  const q = await quote;
   if ("error" in q) push({ group: "1Click", label: "Live 1Click quote for a $10 bill", detail: q.error, ok: false });
   else {
     push({ group: "1Click", label: "1Click quotes BTC to exactly 10.00 USDC on Base", detail: `${Number(q.amountIn).toLocaleString("en-US")} sats in, ${q.amountOutFormatted} USDC out`, ok: q.amountOut === "10000000" });

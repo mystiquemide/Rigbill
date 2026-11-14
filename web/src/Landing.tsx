@@ -13,7 +13,7 @@ export default function Landing() {
   return (
     <>
       <SiteNav />
-      <main>
+      <main id="main">
         <Hero />
         <Doors />
         <How />
@@ -74,6 +74,7 @@ function Hero() {
           <Link to="/miner" className="btn btn-cta">Open the app</Link>
           <Link to="/proof" className="btn btn-dark">See the proof</Link>
         </div>
+        <p className="hero-note">Signing in needs a NEAR wallet, such as Meteor or Intear. The proof needs nothing.</p>
       </div>
       <div className="wrap">
         <ul className="trust" aria-label="On chain right now">
@@ -269,11 +270,12 @@ function ProofSummary() {
           </div>
         </div>
         <div className="checks open-checks" aria-live="polite">
-          {groups.map((g) => {
+          {groups.map((g, gi) => {
             const rows = checks.filter((c) => c.group === g);
             const failed = rows.filter((c) => !c.ok).length;
-            // Counts only mean something once every check has finished.
-            const pending = status === "running";
+            // Checks run in group order, so a group is finished once a later one has started.
+            const laterStarted = checks.some((c) => groups.indexOf(c.group as (typeof groups)[number]) > gi);
+            const pending = status === "running" && !laterStarted;
             const label = status === "error" && rows.length === 0 ? "Couldn't run" : pending ? "Checking" : failed ? `${failed} failed` : `${rows.length} of ${rows.length}`;
             return (
               <div key={g} className="check">

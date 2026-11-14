@@ -8,7 +8,7 @@ const testnet = network === "testnet";
 export const btcNetwork = testnet ? TEST_NETWORK : NETWORK;
 export const CONTRACT_ID = process.env.RIGBILL_CONTRACT || (testnet ? "v1.rigbill.testnet" : "v1.rigbill.near");
 export const SIGNER_ID = process.env.MPC_SIGNER || (testnet ? "v1.signer-prod.testnet" : "v1.signer");
-export const NEAR_RPC_URL = process.env.NEAR_RPC_URL || (testnet ? "https://rpc.testnet.near.org" : "https://rpc.mainnet.near.org");
+export const NEAR_RPC_URL = process.env.NEAR_RPC_URL || (testnet ? "https://rpc.testnet.near.org" : "https://free.rpc.fastnear.com");
 export const ESPLORA_URLS = (
   process.env.ESPLORA_URL ||
   (testnet

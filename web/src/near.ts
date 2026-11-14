@@ -9,6 +9,7 @@ export interface Miner {
 /** Read-only contract call through public RPC. No wallet needed. */
 export async function view<T>(contractId: string, method: string, args: Record<string, unknown>): Promise<T> {
   const res = await fetch(NEAR_RPC, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -78,6 +79,7 @@ export interface TxResult {
 /** Final status of a NEAR transaction, read from RPC rather than trusted from the wallet. */
 export async function txResult(hash: string, sender: string): Promise<TxResult> {
   const res = await fetch(NEAR_RPC, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: "rigbill", method: "tx", params: { tx_hash: hash, sender_account_id: sender, wait_until: "FINAL" } }),

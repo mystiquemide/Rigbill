@@ -31,7 +31,7 @@ export function AppShell({ active, children }: { active: Tab; children: (account
           </div>
         </div>
       </header>
-      <main className="app-body">
+      <main id="main" className="app-body">
         <div className="wrap">
           {account === undefined && <p className="skeleton">Checking for a connected wallet&hellip;</p>}
           {account === null && <SignInPrompt active={active} onConnect={connect} />}

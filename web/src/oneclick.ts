@@ -19,7 +19,7 @@ export interface Quote {
 
 /** Live BTC price in USD from 1Click's token list. */
 export async function btcPriceUsd(): Promise<number> {
-  const res = await fetch(`${API}/tokens`);
+  const res = await fetch(`${API}/tokens`, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`1Click tokens ${res.status}`);
   const tokens: { assetId: string; price: number }[] = await res.json();
   const btc = tokens.find((t) => t.assetId === BTC_ASSET);
@@ -43,6 +43,7 @@ export async function quoteBillInBtc(p: {
   deadline: Date;
 }): Promise<Quote> {
   const res = await fetch(`${API}/quote`, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -73,7 +74,7 @@ export interface SwapStatusResponse {
 }
 
 export async function swapStatus(depositAddress: string): Promise<SwapStatusResponse> {
-  const res = await fetch(`${API}/status?depositAddress=${encodeURIComponent(depositAddress)}`);
+  const res = await fetch(`${API}/status?depositAddress=${encodeURIComponent(depositAddress)}`, { signal: AbortSignal.timeout(15000) });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body?.message ?? `1Click status ${res.status}`);
   return body;

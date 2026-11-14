@@ -34,7 +34,7 @@ export default function ProofPage() {
   return (
     <>
       <SiteNav />
-      <main className="block">
+      <main id="main" className="block">
         <div className="wrap">
           <div className="block-head">
             <div>
