@@ -13,6 +13,7 @@ Built at NEAR HACKATHON · #NEARHackathon · [@NEARProtocol](https://x.com/NEARP
 
 | | |
 |---|---|
+| Demo video | [youtu.be/uXWAdQzu4Tc](https://youtu.be/uXWAdQzu4Tc) (2 minutes) |
 | Live app | [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz) (NEAR mainnet) |
 | Live proof | [rigbill.midelabs.xyz/proof](https://rigbill.midelabs.xyz/proof) |
 | Contract | [`v1.rigbill.near`](https://nearblocks.io/address/v1.rigbill.near) on mainnet, `v1.rigbill.testnet` on testnet |
@@ -468,6 +469,7 @@ Runs 85 contract tests (split rules, who may request a split, per-miner outpoint
 Rigbill is built by [MystiqueMide](https://github.com/mystiquemide), a solo builder, for NEAR HACKATHON (2026-11-01 to 2026-11-14). It started from a plain question: why does a mining host still chase its clients for dollars when their rigs earn money every day? A payout address that can't skip the bill answers that without anyone holding the miner's coins, and NEAR is the only stack where a contract can hold a Bitcoin key and turn BTC into dollars in one flow.
 
 - Live app: [rigbill.midelabs.xyz](https://rigbill.midelabs.xyz)
+- Demo video: [youtu.be/uXWAdQzu4Tc](https://youtu.be/uXWAdQzu4Tc)
 - Demo post: on X with #NEARHackathon, tagging [@NEARProtocol](https://x.com/NEARProtocol)
 - Contact: open an issue on this repository
 
